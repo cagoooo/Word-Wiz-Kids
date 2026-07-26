@@ -31,6 +31,8 @@ export default function Learn() {
   const [reviewWords, setReviewWords] = useState<Word[]>([]);
   const [reviewIndex, setReviewIndex] = useState(0);
   const [knownCount, setKnownCount] = useState(0);
+  // Direction per card: 'zh_to_en' = show Chinese → guess English; 'en_to_zh' = show English → guess Chinese
+  const [reviewDirections, setReviewDirections] = useState<Array<'zh_to_en' | 'en_to_zh'>>([]);
 
   const browseWords = category === "全部"
     ? allWords
@@ -43,7 +45,12 @@ export default function Learn() {
       ? allWords
       : allWords.filter(w => w.category === category);
     const shuffled = [...words].sort(() => Math.random() - 0.5);
+    // Randomly assign direction for each card
+    const directions = shuffled.map((): 'zh_to_en' | 'en_to_zh' =>
+      Math.random() < 0.5 ? 'zh_to_en' : 'en_to_zh'
+    );
     setReviewWords(shuffled);
+    setReviewDirections(directions);
     setReviewIndex(0);
     setKnownCount(0);
     setReviewState("question");
@@ -193,7 +200,16 @@ export default function Learn() {
     }
 
     const word = reviewWords[reviewIndex];
+    const direction = reviewDirections[reviewIndex] ?? 'zh_to_en';
     const progress = Math.round((reviewIndex / reviewWords.length) * 100);
+
+    // What the user sees as the prompt vs. the revealed answer
+    const promptText    = direction === 'zh_to_en' ? word.chinese  : word.english;
+    const promptHint    = direction === 'zh_to_en' ? '這個單字的英文是什麼呢？' : '這個單字的中文是什麼呢？';
+    const answerHeading = direction === 'zh_to_en' ? word.english  : word.chinese;
+    const directionBadge = direction === 'zh_to_en'
+      ? { label: '中 → 英', bg: 'bg-rose-100 text-rose-700' }
+      : { label: '英 → 中', bg: 'bg-blue-100 text-blue-700' };
 
     return (
       <div className="flex-1 flex flex-col items-center w-full max-w-md mx-auto mt-4">
@@ -215,7 +231,7 @@ export default function Learn() {
         <div className="w-full">
           <AnimatePresence mode="wait">
             <motion.div
-              key={word.id + reviewState}
+              key={word.id + reviewState + direction}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
@@ -227,14 +243,19 @@ export default function Learn() {
                   className="w-full aspect-[3/4] bg-card rounded-[2rem] shadow-xl border-2 border-border flex flex-col items-center justify-center p-8 text-center relative overflow-hidden"
                   data-testid="review-question"
                 >
-                  <div className="absolute top-6 left-6 px-4 py-1.5 bg-muted text-muted-foreground rounded-full font-bold text-sm tracking-widest">
-                    {word.category}
+                  <div className="absolute top-6 left-6 flex items-center gap-2">
+                    <span className="px-4 py-1.5 bg-muted text-muted-foreground rounded-full font-bold text-sm tracking-widest">
+                      {word.category}
+                    </span>
+                    <span className={`px-3 py-1.5 rounded-full font-black text-sm ${directionBadge.bg}`}>
+                      {directionBadge.label}
+                    </span>
                   </div>
                   <h2 className="text-6xl font-black text-foreground tracking-wider mb-8">
-                    {word.chinese}
+                    {promptText}
                   </h2>
                   <p className="text-lg text-muted-foreground font-medium mb-12">
-                    這個單字的英文是什麼呢？
+                    {promptHint}
                   </p>
                   <Button
                     size="lg"
@@ -253,14 +274,14 @@ export default function Learn() {
                   className="w-full aspect-[3/4] bg-card rounded-[2rem] shadow-xl border-2 border-border flex flex-col items-center justify-center p-8 relative"
                   data-testid="review-answer"
                 >
-                  <div className="flex-1 flex flex-col items-center justify-center gap-8 w-full text-center">
-                    <div className="text-5xl font-black text-foreground">
-                      {word.chinese}
-                    </div>
-                    <div className="flex flex-col items-center gap-4">
+                  <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full text-center">
+                    {/* Always show both Chinese and English in the answer */}
+                    <div className="text-4xl font-black text-muted-foreground">{word.chinese}</div>
+                    <div className="flex flex-col items-center gap-3">
                       <PhoneticHighlight word={word} />
                       <p className="text-2xl text-muted-foreground font-mono tracking-wider">{word.phonetic}</p>
                     </div>
+                    <div className="text-3xl font-black text-foreground">{answerHeading}</div>
                     <Button
                       variant="ghost"
                       size="icon"

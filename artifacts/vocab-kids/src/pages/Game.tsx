@@ -170,7 +170,8 @@ export default function Game() {
   useEffect(() => {
     if (state.phase === 'question' && state.selectedOptionIndex === null) {
       const q = state.questions[state.currentQuestionIndex];
-      speakWord(q.word.english);
+      // Only auto-speak when prompt is English (en_to_zh); for zh_to_en the user reads Chinese
+      if (q.direction === 'en_to_zh') speakWord(q.word.english);
 
       setTimerWidth('100%');
       const transitionTimer = setTimeout(() => {
@@ -229,6 +230,7 @@ export default function Game() {
     const q = state.questions[state.currentQuestionIndex];
     const isCorrect = index === q.correctIndex;
     
+    // Always speak the English word to reinforce pronunciation regardless of direction
     speakWord(q.options[index].english);
 
     const scoreGain = isCorrect ? calcScore(timeLeft, QUESTION_TIME_MS, state.combo) : 0;
@@ -370,11 +372,24 @@ export default function Game() {
 
         {/* Word Display */}
         <div className="flex-1 flex flex-col items-center justify-center mb-6 relative">
+          {/* Direction badge */}
+          <div className={`mb-4 px-6 py-2 rounded-full text-base font-black tracking-widest shadow-sm border-2 ${q.direction === 'en_to_zh' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
+            {q.direction === 'en_to_zh' ? '看英文，選中文' : '看中文，選英文'}
+          </div>
+
           <div className="text-center bg-card rounded-[3rem] shadow-2xl border-8 border-white w-full py-16 md:py-32 relative overflow-hidden flex flex-col items-center justify-center min-h-[300px]">
-            <h2 className="text-6xl sm:text-8xl md:text-[10rem] font-black text-foreground tracking-wide drop-shadow-sm px-4">
-              {q.word.english}
-            </h2>
-            
+            <AnimatePresence mode="wait">
+              <motion.h2
+                key={q.word.id + q.direction}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
+                className="text-6xl sm:text-8xl md:text-[10rem] font-black text-foreground tracking-wide drop-shadow-sm px-4"
+              >
+                {q.direction === 'en_to_zh' ? q.word.english : q.word.chinese}
+              </motion.h2>
+            </AnimatePresence>
+
             <AnimatePresence>
               {state.selectedOptionIndex !== null && state.selectedOptionIndex === q.correctIndex && (
                 <motion.div
@@ -410,11 +425,14 @@ export default function Game() {
             const isCorrect = state.selectedOptionIndex !== null && isCorrectAnswer;
             const isWrong = state.selectedOptionIndex !== null && isSelected && !isCorrectAnswer;
             const disabled = state.selectedOptionIndex !== null;
+            // en_to_zh: prompt is English, answers are Chinese
+            // zh_to_en: prompt is Chinese, answers are English
+            const optionLabel = q.direction === 'en_to_zh' ? opt.chinese : opt.english;
 
             return (
               <AnswerButton
                 key={opt.id}
-                label={opt.chinese}
+                label={optionLabel}
                 slotIndex={i}
                 isSelected={isSelected}
                 isCorrect={isCorrect}

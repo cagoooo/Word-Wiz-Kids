@@ -1,9 +1,14 @@
 import { Word } from '../data/words';
 
+export type QuestionDirection = 'en_to_zh' | 'zh_to_en';
+
 export interface Question {
   word: Word;
   options: Word[];
   correctIndex: number;
+  /** en_to_zh: show English prompt, select Chinese answer.
+   *  zh_to_en: show Chinese prompt, select English answer. */
+  direction: QuestionDirection;
 }
 
 export function generateQuestions(words: Word[], count: number): Question[] {
@@ -15,20 +20,24 @@ export function generateQuestions(words: Word[], count: number): Question[] {
     // Pick distractors
     const otherWords = words.filter(w => w.id !== correctWord.id);
     const shuffledOthers = [...otherWords].sort(() => Math.random() - 0.5);
-    
+
     // If pool has < 4 words, use what is available
     const numDistractors = Math.min(3, shuffledOthers.length);
     const distractors = shuffledOthers.slice(0, numDistractors);
-    
+
     const options = [correctWord, ...distractors];
     // Shuffle options
     const shuffledOptions = [...options].sort(() => Math.random() - 0.5);
     const correctIndex = shuffledOptions.findIndex(w => w.id === correctWord.id);
 
+    // Randomly alternate direction for variety
+    const direction: QuestionDirection = Math.random() < 0.5 ? 'en_to_zh' : 'zh_to_en';
+
     return {
       word: correctWord,
       options: shuffledOptions,
-      correctIndex
+      correctIndex,
+      direction,
     };
   });
 }
