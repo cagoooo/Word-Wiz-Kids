@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "VocabKids - 兒童英文單字學習"
+version = "1.0.0"
+id = "artifacts/vocab-kids"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 22362
+
+[services.development]
+run = "pnpm --filter @workspace/vocab-kids run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/vocab-kids", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/vocab-kids/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "22362"
+BASE_PATH = "/"

@@ -1,44 +1,62 @@
-# [Project name]
+# 單字小英雄 (VocabKids)
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+台灣兒童英文單字學習平台，透過遊戲化方式（Kahoot 風格）幫助 5–10 歲小朋友學習英文單字，結合 Three.js 3D 動畫、TTS 發音、Firebase 即時排行榜與 Gemini Vision 後台辨識。
 
 ## Run & Operate
 
-- `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/vocab-kids run dev` — 執行前端 (port 22362)
+- `pnpm --filter @workspace/api-server run dev` — 執行 API Server (port 8080)
+- `pnpm run typecheck` — 全專案 TypeScript 型別檢查
+- `pnpm run build` — 建置全部套件
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- 前端：React + Vite、Three.js / @react-three/fiber、framer-motion、wouter、Tailwind CSS
+- 後端：Express 5（API Server，Task #4 後主要改用 Firebase）
+- 資料庫：Firebase Firestore（Task #4 串接，需填入 VITE_FIREBASE_* 環境變數）
+- AI：Gemini 2.5 Flash（Task #5 後台圖片辨識）
+- PWA：manifest.webmanifest + Service Worker
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/vocab-kids/` — 前端 React 應用程式
+  - `src/pages/` — 各頁面：首頁、學習、遊戲、排行榜、管理
+  - `src/components/hero/HeroScene.tsx` — Three.js 3D 首頁動畫
+  - `src/components/layout/Navbar.tsx` — 導覽列（含手機漢堡選單）
+  - `public/manifest.webmanifest` — PWA 設定
+  - `public/sw.js` — Service Worker（cache-first 策略）
+- `artifacts/api-server/` — Express API Server
+- `lib/api-spec/openapi.yaml` — API 合約（單一真實來源）
+- `lib/db/src/schema/` — Drizzle ORM 資料庫 Schema
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- Firebase 作為主要後端（Task #4），Express API Server 保留供非 Firebase 功能使用
+- Gemini API Key 以環境變數（VITE_GEMINI_API_KEY）管理，或透過 Replit Gemini Integration
+- Service Worker 採 cache-first 策略，版本號碼在 `public/sw.js` 中的 CACHE_NAME 控制
+- Three.js 場景在無 WebGL 環境下（如測試沙盒）自動降級為 CSS 動畫背景
+- 全介面採繁體中文
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+- **首頁** (`/`)：Three.js 3D 動畫主視覺 + 功能介紹卡
+- **學習** (`/learn`)：單字卡學習模式，含 TTS 發音與音標高亮（Task #2）
+- **遊戲** (`/game`)：Kahoot 風格四選一測驗、計時計分、Combo（Task #3）
+- **排行榜** (`/leaderboard`)：Firebase 即時排名（Task #4）
+- **管理** (`/admin`)：PIN 碼保護後台，Gemini Vision 單字辨識（Task #5）
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+- 全介面使用繁體中文（台灣用語）
+- 品牌名稱：單字小英雄
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- 修改 Service Worker 快取策略後，需同步更新 `CACHE_NAME` 版本號碼避免舊快取問題
+- Three.js WebGL 在 Replit 預覽沙盒中無法使用，已實作 CSS 星點動畫作為 fallback
+- Firebase 環境變數尚未設定，Task #4 完成後填入即可
+- PWA 圖示存於 `artifacts/vocab-kids/public/`
 
 ## Pointers
 
