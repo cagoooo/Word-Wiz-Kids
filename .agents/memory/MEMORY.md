@@ -1,0 +1,1 @@
+- [React 19 + react-reconciler conflict](react19-reconciler-conflict.md) — @react-three/fiber crashes entire app in React 19; use CSS animations instead; verify app with curl not screenshots when browser session is stale.
