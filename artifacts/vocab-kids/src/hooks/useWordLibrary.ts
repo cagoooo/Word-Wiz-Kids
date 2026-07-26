@@ -1,10 +1,9 @@
 /**
- * useWordLibrary — loads words from Firestore (when Firebase is configured)
- * and merges them with MOCK_WORDS (static fallback).
- * Firestore words take priority when IDs collide.
+ * useWordLibrary — loads words from Firestore in real-time.
+ * MOCK_WORDS fallback has been removed; all words come from Firestore.
+ * When Firebase is not configured, returns an empty list with loading=false.
  */
 import { useState, useEffect } from 'react';
-import { MOCK_WORDS, CATEGORIES } from '@/data/words';
 import type { Word } from '@/data/words';
 import { subscribeWords } from '@/lib/firestoreWords';
 import { isFirebaseConfigured } from '@/lib/firebase';
@@ -16,7 +15,7 @@ export interface WordLibrary {
 }
 
 export function useWordLibrary(): WordLibrary {
-  const [firestoreWords, setFirestoreWords] = useState<Word[] | null>(null);
+  const [words, setWords] = useState<Word[]>([]);
   const [loading, setLoading] = useState(isFirebaseConfigured);
 
   useEffect(() => {
@@ -29,54 +28,34 @@ export function useWordLibrary(): WordLibrary {
 
     const unsubscribe = subscribeWords(
       (fetched) => {
-        setFirestoreWords(
+        setWords(
           fetched.map((fw) => ({
             id: fw.id,
             english: fw.english,
             chinese: fw.chinese,
             phonetic: fw.phonetic,
             category: fw.category,
-            example: fw.example,
-            exampleChinese: fw.exampleChinese,
+            example: fw.example ?? `I see a ${fw.english}.`,
+            exampleChinese: fw.exampleChinese ?? `我看到一個${fw.chinese}。`,
             vowels: fw.vowels ?? [],
             diphthongs: fw.diphthongs ?? [],
-          }))
+          })),
         );
         setLoading(false);
       },
       () => {
-        // Network / permission error — fall back silently to MOCK_WORDS
-        setFirestoreWords([]);
+        setWords([]);
         setLoading(false);
       },
     );
 
-    return () => {
-      unsubscribe();
-    };
+    return () => unsubscribe();
   }, []);
 
-  // Merge: Firestore words override MOCK_WORDS by id, new ones are appended.
-  const words: Word[] = (() => {
-    if (!firestoreWords || firestoreWords.length === 0) return MOCK_WORDS;
-
-    const firestoreMap = new Map(firestoreWords.map((w) => [w.id, w]));
-    const merged: Word[] = MOCK_WORDS.map((w) => firestoreMap.get(w.id) ?? w);
-    const mockIds = new Set(MOCK_WORDS.map((w) => w.id));
-
-    for (const fw of firestoreWords) {
-      if (!mockIds.has(fw.id)) merged.push(fw);
-    }
-    return merged;
-  })();
-
-  // Derive categories: keep the static order, then append any new Firestore categories.
+  // Derive categories: "全部" always first, then unique categories from words
   const categories: string[] = (() => {
-    const extra = words
-      .map((w) => w.category)
-      .filter((cat) => !CATEGORIES.includes(cat));
-    const unique = Array.from(new Set(extra));
-    return unique.length > 0 ? [...CATEGORIES, ...unique] : CATEGORIES;
+    const unique = Array.from(new Set(words.map((w) => w.category)));
+    return ['全部', ...unique.sort((a, b) => a.localeCompare(b, 'zh-Hant'))];
   })();
 
   return { words, categories, loading };

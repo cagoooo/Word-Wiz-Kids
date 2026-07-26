@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Volume2, ChevronLeft, ChevronRight, Check, X, RefreshCw, BookOpen, BrainCircuit, Loader2 } from 'lucide-react';
 import { Word } from '@/data/words';
@@ -13,6 +13,13 @@ export default function Learn() {
 
   const [mode, setMode] = useState<"browse" | "review">("browse");
   const [category, setCategory] = useState<string>("全部");
+  const cardsRef = useRef<HTMLDivElement>(null);
+
+  function scrollToCards() {
+    setTimeout(() => {
+      cardsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }
 
   // Browse state
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -310,7 +317,7 @@ export default function Learn() {
         <div className="flex bg-muted p-1.5 rounded-full">
           <button
             className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all ${mode === 'browse' ? 'bg-card shadow-sm text-primary scale-105' : 'text-muted-foreground hover:text-foreground'}`}
-            onClick={() => setMode('browse')}
+            onClick={() => { setMode('browse'); scrollToCards(); }}
             data-testid="tab-browse"
           >
             <BookOpen className="w-5 h-5" />
@@ -318,11 +325,11 @@ export default function Learn() {
           </button>
           <button
             className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all ${mode === 'review' ? 'bg-card shadow-sm text-primary scale-105' : 'text-muted-foreground hover:text-foreground'}`}
-            onClick={() => setMode('review')}
+            onClick={() => { setMode('review'); scrollToCards(); }}
             data-testid="tab-review"
           >
             <BrainCircuit className="w-5 h-5" />
-            複習模式
+            開始學習
           </button>
         </div>
       </div>
@@ -332,7 +339,7 @@ export default function Learn() {
         {categories.map(cat => (
           <button
             key={cat}
-            onClick={() => setCategory(cat)}
+            onClick={() => { setCategory(cat); scrollToCards(); }}
             className={`px-5 py-2.5 rounded-xl font-bold tracking-widest transition-all ${category === cat ? 'bg-primary text-primary-foreground shadow-md scale-105' : 'bg-card text-muted-foreground hover:bg-muted border border-border'}`}
             data-testid={`category-${cat}`}
           >
@@ -348,15 +355,17 @@ export default function Learn() {
         </div>
       )}
 
-      {/* Loading state */}
-      {loading ? (
-        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
-          <Loader2 className="w-10 h-10 animate-spin text-primary" />
-          <p className="font-bold tracking-wide">載入單字庫中…</p>
-        </div>
-      ) : (
-        mode === 'browse' ? renderBrowse() : renderReview()
-      )}
+      {/* Word cards area — scroll target */}
+      <div ref={cardsRef}>
+        {loading ? (
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground py-16">
+            <Loader2 className="w-10 h-10 animate-spin text-primary" />
+            <p className="font-bold tracking-wide">載入單字庫中…</p>
+          </div>
+        ) : (
+          mode === 'browse' ? renderBrowse() : renderReview()
+        )}
+      </div>
     </div>
   );
 }

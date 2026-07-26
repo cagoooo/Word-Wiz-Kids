@@ -7,8 +7,9 @@
  *
  * All text in Traditional Chinese. No emojis.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useLocation } from 'wouter';
 import {
   Shield, KeyRound, ArrowRight,
   BarChart3, Users, Star, Target, Gamepad2, RefreshCw, AlertCircle,
@@ -249,6 +250,7 @@ function GeminiVisionTab() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const resultsRef = useRef<HTMLDivElement>(null);
 
   async function handleImage(base64: string, mimeType: string, preview: string) {
     setPreviewUrl(preview);
@@ -259,7 +261,14 @@ function GeminiVisionTab() {
     try {
       const words = await analyzeImageForWords(base64, mimeType);
       setExtractedWords(words);
-      if (words.length === 0) setError('Gemini 未偵測到英文單字。請試試包含清晰英文字詞的圖片。');
+      if (words.length === 0) {
+        setError('Gemini 未偵測到英文單字。請試試包含清晰英文字詞的圖片。');
+      } else {
+        // 辨識完成後自動捲動到結果區塊
+        setTimeout(() => {
+          resultsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 150);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : '辨識失敗，請再試一次。');
     } finally {
@@ -313,7 +322,9 @@ function GeminiVisionTab() {
       {!extractedWords ? (
         <ImageUploader onImage={handleImage} loading={loading} />
       ) : (
-        <WordExtractResult words={extractedWords} onSaved={handleSaved} onReset={handleReset} />
+        <div ref={resultsRef}>
+          <WordExtractResult words={extractedWords} onSaved={handleSaved} onReset={handleReset} />
+        </div>
       )}
     </div>
   );
@@ -382,13 +393,19 @@ function AdminDashboard({ onLock }: { onLock: () => void }) {
 
 export default function Admin() {
   const [unlocked, setUnlocked] = useState(false);
+  const [, navigate] = useLocation();
+
+  function handleLock() {
+    setUnlocked(false);
+    navigate('/');
+  }
 
   return (
     <div className="min-h-[100dvh] pt-24 pb-12 px-4 bg-background relative overflow-hidden">
       <div className="absolute top-[10%] left-[-10%] w-96 h-96 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
       <AnimatePresence mode="wait">
         {unlocked
-          ? <AdminDashboard key="dashboard" onLock={() => setUnlocked(false)} />
+          ? <AdminDashboard key="dashboard" onLock={handleLock} />
           : <PinPad key="pin" onSuccess={() => setUnlocked(true)} />
         }
       </AnimatePresence>

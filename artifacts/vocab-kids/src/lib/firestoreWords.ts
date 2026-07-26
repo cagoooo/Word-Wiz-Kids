@@ -86,9 +86,15 @@ export function buildWordRecord(params: {
 
 export async function getAllWords(): Promise<FirestoreWord[]> {
   if (!isFirebaseConfigured || !db) return [];
-  const q = query(collection(db, 'words'), orderBy('category'), orderBy('english'));
+  // Single-field orderBy only — composite indexes require manual Firestore setup.
+  // Secondary sort (by english within category) is done client-side.
+  const q = query(collection(db, 'words'), orderBy('english'));
   const snap = await getDocs(q);
-  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreWord));
+  const words = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreWord));
+  // Client-side sort: group by category, then by english within each group
+  return words.sort((a, b) =>
+    a.category.localeCompare(b.category) || a.english.localeCompare(b.english),
+  );
 }
 
 /**
@@ -104,11 +110,13 @@ export function subscribeWords(
     // No-op: immediately return a no-op unsubscribe
     return () => {};
   }
-  const q = query(collection(db, 'words'), orderBy('category'), orderBy('english'));
+  const q = query(collection(db, 'words'), orderBy('english'));
   return onSnapshot(
     q,
     (snap) => {
-      const words = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreWord));
+      const words = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() } as FirestoreWord))
+        .sort((a, b) => a.category.localeCompare(b.category) || a.english.localeCompare(b.english));
       onUpdate(words);
     },
     (err) => {
