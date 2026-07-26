@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, ChevronLeft, ChevronRight, Check, X, RefreshCw, BookOpen, BrainCircuit, Loader2 } from 'lucide-react';
+import { Volume2, VolumeX, ChevronLeft, ChevronRight, Check, X, RefreshCw, BookOpen, BrainCircuit, Loader2 } from 'lucide-react';
+import { startBGM, stopBGM, sfxCorrect, sfxWrong, sfxCardFlip } from '@/lib/soundEngine';
+import { useSoundSettings } from '@/hooks/useSoundSettings';
 import { Word } from '@/data/words';
 import { speakWord, isTTSSupported } from '@/lib/tts';
 import { WordCard } from '@/components/learn/WordCard';
@@ -10,6 +12,13 @@ import { useWordLibrary } from '@/hooks/useWordLibrary';
 
 export default function Learn() {
   const { words: allWords, categories, loading } = useWordLibrary();
+  const { muted, toggleMute } = useSoundSettings();
+
+  // BGM lifecycle — play while on this page, stop on unmount or mute
+  useEffect(() => {
+    if (!muted) startBGM();
+    return () => stopBGM();
+  }, [muted]);
 
   const [mode, setMode] = useState<"browse" | "review">("browse");
   const [category, setCategory] = useState<string>("全部");
@@ -81,17 +90,20 @@ export default function Learn() {
   }, [currentIndex, currentBrowseWord, mode]);
 
   const handlePrev = () => {
+    sfxCardFlip();
     setIsFlipped(false);
     setCurrentIndex(prev => (prev === 0 ? browseWords.length - 1 : prev - 1));
   };
 
   const handleNext = () => {
+    sfxCardFlip();
     setIsFlipped(false);
     setCurrentIndex(prev => (prev === browseWords.length - 1 ? 0 : prev + 1));
   };
 
   const handleNextReview = (known: boolean) => {
-    if (known) setKnownCount(prev => prev + 1);
+    if (known) { sfxCorrect(); setKnownCount(prev => prev + 1); }
+    else sfxWrong();
     if (reviewIndex === reviewWords.length - 1) {
       setReviewState('summary');
     } else {
@@ -260,6 +272,7 @@ export default function Learn() {
                   <Button
                     size="lg"
                     onClick={() => {
+                      sfxCardFlip();
                       setReviewState('answer');
                       speakWord(word.english);
                     }}
@@ -334,7 +347,15 @@ export default function Learn() {
           </p>
         </div>
 
-        {/* Mode toggle */}
+        {/* Mute toggle + Mode toggle */}
+        <div className="flex items-center gap-3">
+          <button
+            onClick={toggleMute}
+            className="p-2.5 rounded-full bg-muted text-muted-foreground hover:text-foreground transition-colors hover:scale-105 active:scale-95"
+            aria-label={muted ? '開啟音效' : '關閉音效'}
+          >
+            {muted ? <VolumeX className="w-5 h-5" /> : <Volume2 className="w-5 h-5" />}
+          </button>
         <div className="flex bg-muted p-1.5 rounded-full">
           <button
             className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-bold transition-all ${mode === 'browse' ? 'bg-card shadow-sm text-primary scale-105' : 'text-muted-foreground hover:text-foreground'}`}
@@ -353,6 +374,7 @@ export default function Learn() {
             開始學習
           </button>
         </div>
+        </div>{/* end flex items-center gap-3 */}
       </div>
 
       {/* Category filter */}

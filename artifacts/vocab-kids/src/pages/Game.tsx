@@ -1,6 +1,6 @@
 import { useReducer, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Play, ArrowLeft, Trophy, Loader2 } from 'lucide-react';
+import { Star, Play, ArrowLeft, Trophy, Loader2, Volume2, VolumeX } from 'lucide-react';
 import { Link } from 'wouter';
 import { speakWord } from '@/lib/tts';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
@@ -9,6 +9,12 @@ import { AnswerButton } from '@/components/game/AnswerButton';
 import { generateQuestions, calcScore, getStarRating, Question } from '@/lib/gameUtils';
 import { submitScore } from '@/lib/firestore';
 import { loadStudent, getOrCreateStudentId } from '@/hooks/useStudent';
+import {
+  startBGM, stopBGM,
+  sfxCorrect, sfxWrong,
+  sfxCountdownTick, sfxCountdownGo, sfxLevelComplete,
+} from '@/lib/soundEngine';
+import { useSoundSettings } from '@/hooks/useSoundSettings';
 
 type GamePhase = 'select' | 'countdown' | 'question' | 'results';
 
@@ -111,11 +117,18 @@ const DIFFICULTY_LABELS = {
 
 export default function Game() {
   const { words: allWords, categories, loading } = useWordLibrary();
+  const { muted, toggleMute } = useSoundSettings();
 
   // Keep a stable ref to allWords so the countdown useEffect can read the
   // latest value without being re-triggered every time allWords changes.
   const allWordsRef = useRef(allWords);
   useEffect(() => { allWordsRef.current = allWords; }, [allWords]);
+
+  // BGM lifecycle — play while this page is open, stop on unmount or mute
+  useEffect(() => {
+    if (!muted) startBGM();
+    return () => stopBGM();
+  }, [muted]);
 
   const [state, dispatch] = useReducer(gameReducer, {
     phase: 'select',
@@ -155,10 +168,11 @@ export default function Game() {
 
   useEffect(() => {
     if (state.phase === 'countdown') {
+      sfxCountdownTick();
       setCountdown(3);
-      const timer3 = setTimeout(() => setCountdown(2), 1000);
-      const timer2 = setTimeout(() => setCountdown(1), 2000);
-      const timer1 = setTimeout(() => setCountdown(0), 3000);
+      const timer3 = setTimeout(() => { setCountdown(2); sfxCountdownTick(); }, 1000);
+      const timer2 = setTimeout(() => { setCountdown(1); sfxCountdownTick(); }, 2000);
+      const timer1 = setTimeout(() => { setCountdown(0); sfxCountdownGo(); }, 3000);
       const timerStart = setTimeout(() => {
         const words = state.category === '全部'
           ? allWordsRef.current
@@ -205,9 +219,10 @@ export default function Game() {
     return undefined;
   }, [state.phase, state.currentQuestionIndex, state.selectedOptionIndex, state.questions]);
 
-  // Submit score to Firestore when game ends
+  // Submit score to Firestore when game ends + play completion SFX
   useEffect(() => {
     if (state.phase !== 'results' || state.questions.length === 0) return undefined;
+    sfxLevelComplete();
     const student = loadStudent();
     const studentId = getOrCreateStudentId();
     const nickname = student?.nickname || '無名英雄';
@@ -239,7 +254,8 @@ export default function Game() {
 
     const q = state.questions[state.currentQuestionIndex];
     const isCorrect = index === q.correctIndex;
-    
+    if (isCorrect) sfxCorrect(); else sfxWrong();
+
     // Always speak the English word to reinforce pronunciation regardless of direction
     speakWord(q.options[index].english);
 
@@ -361,47 +377,58 @@ export default function Game() {
     if (!q) return null;
 
     return (
-      <div className="relative z-10 w-full max-w-6xl flex flex-col h-[100dvh] pt-6 pb-6 px-4 md:px-8">
+      <div className="relative z-10 w-full max-w-6xl flex flex-col h-[100dvh] pt-3 pb-3 px-3 sm:pt-5 sm:pb-5 sm:px-4 md:px-8">
         {/* Top Bar */}
-        <div className="flex justify-between items-center mb-6 bg-card/95 backdrop-blur-md rounded-full p-3 pl-8 pr-4 shadow-lg border-4 border-white/20">
-          <div className="text-2xl font-black text-muted-foreground tracking-wider">
-            第 {state.currentQuestionIndex + 1} / {state.questions.length} 題
+        <div className="flex justify-between items-center mb-3 sm:mb-5 bg-card/95 backdrop-blur-md rounded-full p-2 pl-4 sm:pl-8 pr-2 sm:pr-4 shadow-lg border-2 sm:border-4 border-white/20">
+          <div className="text-sm sm:text-2xl font-black text-muted-foreground tracking-wider whitespace-nowrap">
+            {state.currentQuestionIndex + 1} / {state.questions.length} 題
           </div>
-          
-          <div className="flex items-center gap-6">
+
+          <div className="flex items-center gap-2 sm:gap-4">
             <AnimatePresence>
               {state.combo >= 2 && (
                 <motion.div
                   initial={{ scale: 0, x: 20 }}
                   animate={{ scale: 1, x: 0 }}
                   exit={{ scale: 0, opacity: 0 }}
-                  className="bg-orange-500 text-white px-6 py-2 rounded-full font-black text-xl shadow-lg border-2 border-orange-300"
+                  className="bg-orange-500 text-white px-3 sm:px-6 py-1 sm:py-2 rounded-full font-black text-sm sm:text-xl shadow-lg border-2 border-orange-300 whitespace-nowrap"
                 >
                   x{state.combo >= 4 ? '2.0' : '1.5'} 連擊！
                 </motion.div>
               )}
             </AnimatePresence>
-            <div className="bg-primary text-primary-foreground px-8 py-3 rounded-full text-3xl font-black shadow-inner border-2 border-primary-foreground/20">
+            <div className="bg-primary text-primary-foreground px-4 sm:px-8 py-2 sm:py-3 rounded-full text-xl sm:text-3xl font-black shadow-inner border-2 border-primary-foreground/20 whitespace-nowrap">
               {state.score} 分
             </div>
+            {/* Mute toggle */}
+            <button
+              onClick={toggleMute}
+              className="text-white/80 hover:text-white transition-colors bg-white/15 hover:bg-white/25 p-2 sm:p-2.5 rounded-full"
+              aria-label={muted ? '開啟音效' : '關閉音效'}
+            >
+              {muted
+                ? <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />
+                : <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
+            </button>
           </div>
         </div>
 
         {/* Word Display */}
         <div className="flex-1 flex flex-col items-center justify-center mb-6 relative">
           {/* Direction badge */}
-          <div className={`mb-4 px-6 py-2 rounded-full text-base font-black tracking-widest shadow-sm border-2 ${q.direction === 'en_to_zh' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
+          <div className={`mb-2 sm:mb-3 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-black tracking-widest shadow-sm border-2 ${q.direction === 'en_to_zh' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
             {q.direction === 'en_to_zh' ? '看英文，選中文' : '看中文，選英文'}
           </div>
 
-          <div className="text-center bg-card rounded-[3rem] shadow-2xl border-8 border-white w-full py-16 md:py-32 relative overflow-hidden flex flex-col items-center justify-center min-h-[300px]">
+          <div className="text-center bg-card rounded-[1.5rem] sm:rounded-[3rem] shadow-2xl border-4 sm:border-8 border-white w-full py-5 sm:py-14 md:py-24 relative overflow-hidden flex flex-col items-center justify-center min-h-[100px] sm:min-h-[180px]">
             <AnimatePresence mode="wait">
               <motion.h2
                 key={q.word.id + q.direction}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="text-6xl sm:text-8xl md:text-[10rem] font-black text-foreground tracking-wide drop-shadow-sm px-4"
+                className="font-black text-foreground drop-shadow-sm px-3 break-words w-full"
+                style={{ fontSize: 'clamp(1.8rem, 13vw, 9rem)', letterSpacing: '0.02em' }}
               >
                 {q.direction === 'en_to_zh' ? q.word.english : q.word.chinese}
               </motion.h2>
@@ -410,32 +437,32 @@ export default function Game() {
             <AnimatePresence>
               {state.selectedOptionIndex !== null && state.selectedOptionIndex === q.correctIndex && (
                 <motion.div
-                  initial={{ opacity: 0, scale: 0, y: 50 }}
+                  initial={{ opacity: 0, scale: 0, y: 30 }}
                   animate={{ opacity: 1, scale: 1, y: 0 }}
                   exit={{ opacity: 0 }}
-                  className="absolute top-1/4 right-1/4 md:right-32 text-6xl md:text-8xl font-black text-green-500 drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)] rotate-12"
+                  className="absolute top-1 right-2 sm:top-1/4 sm:right-1/4 md:right-32 text-3xl sm:text-6xl md:text-8xl font-black text-green-500 drop-shadow-[0_4px_4px_rgba(0,0,0,0.2)] rotate-12"
                 >
                   +{state.lastScoreGain}
                 </motion.div>
               )}
             </AnimatePresence>
           </div>
-          
+
           {/* Timer bar */}
-          <div className="w-full h-8 bg-card/40 backdrop-blur-sm rounded-full mt-8 overflow-hidden shadow-inner border-4 border-white/30 p-1">
-            <div 
+          <div className="w-full h-3 sm:h-5 bg-card/40 backdrop-blur-sm rounded-full mt-3 sm:mt-5 overflow-hidden shadow-inner border-2 sm:border-4 border-white/30 p-0.5">
+            <div
               className={`h-full rounded-full ${state.selectedOptionIndex !== null ? (state.selectedOptionIndex === q.correctIndex ? 'bg-green-400' : 'bg-red-400') : 'bg-primary'}`}
               style={{
                 width: timerWidth,
                 transitionDuration: state.selectedOptionIndex !== null ? '0ms' : `${QUESTION_TIME_MS}ms`,
-                transitionTimingFunction: 'linear'
+                transitionTimingFunction: 'linear',
               }}
             />
           </div>
         </div>
 
         {/* Answers Grid */}
-        <div className="grid grid-cols-2 gap-4 md:gap-6 w-full shrink-0">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-5 w-full shrink-0">
           {q.options.map((opt, i) => {
             const isSelected = state.selectedOptionIndex === i;
             const isCorrectAnswer = i === q.correctIndex;
@@ -531,7 +558,11 @@ export default function Game() {
   };
 
   return (
-    <div className="min-h-[100dvh] flex flex-col items-center justify-center relative overflow-hidden bg-background">
+    <div className={`min-h-[100dvh] flex flex-col items-center relative bg-background ${
+      state.phase === 'question' || state.phase === 'countdown'
+        ? 'justify-center overflow-hidden'
+        : 'justify-start md:justify-center overflow-y-auto py-4 sm:py-6 md:py-0'
+    }`}>
       <style>{`
         @keyframes bg-pan {
           0% { background-position: 0% 50%; }
