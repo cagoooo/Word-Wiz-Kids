@@ -12,11 +12,13 @@ export interface WordLibrary {
   words: Word[];
   categories: string[];
   loading: boolean;
+  error: boolean;        // true 表示 Firestore 連線失敗
 }
 
 export function useWordLibrary(): WordLibrary {
   const [words, setWords] = useState<Word[]>([]);
   const [loading, setLoading] = useState(isFirebaseConfigured);
+  const [error, setError] = useState(false);
 
   useEffect(() => {
     if (!isFirebaseConfigured) {
@@ -28,15 +30,16 @@ export function useWordLibrary(): WordLibrary {
 
     const unsubscribe = subscribeWords(
       (fetched) => {
+        setError(false);
         setWords(
           fetched.map((fw) => ({
             id: fw.id,
             english: fw.english,
             chinese: fw.chinese,
-            phonetic: fw.phonetic,
+            phonetic: fw.phonetic || undefined,
             category: fw.category,
-            example: fw.example ?? `I see a ${fw.english}.`,
-            exampleChinese: fw.exampleChinese ?? `我看到一個${fw.chinese}。`,
+            example: fw.example || undefined,
+            exampleChinese: fw.exampleChinese || undefined,
             vowels: fw.vowels ?? [],
             diphthongs: fw.diphthongs ?? [],
           })),
@@ -45,6 +48,7 @@ export function useWordLibrary(): WordLibrary {
       },
       () => {
         setWords([]);
+        setError(true);
         setLoading(false);
       },
     );
@@ -58,5 +62,5 @@ export function useWordLibrary(): WordLibrary {
     return ['全部', ...unique.sort((a, b) => a.localeCompare(b, 'zh-Hant'))];
   })();
 
-  return { words, categories, loading };
+  return { words, categories, loading, error };
 }

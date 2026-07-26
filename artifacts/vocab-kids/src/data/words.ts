@@ -2,10 +2,10 @@ export interface Word {
   id: string;
   english: string;
   chinese: string;
-  phonetic: string;
+  phonetic?: string;          // 可選：注音/音標
   category: string;
-  example: string;
-  exampleChinese: string;
+  example?: string;           // 可選：英文例句
+  exampleChinese?: string;    // 可選：中文例句翻譯
   vowels: number[];
   diphthongs: { start: number; length: number }[];
 }

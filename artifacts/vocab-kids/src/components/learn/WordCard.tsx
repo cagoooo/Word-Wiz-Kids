@@ -37,9 +37,11 @@ export function WordCard({ word, isFlipped, onFlip, onSpeak }: WordCardProps) {
 
           <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full text-center">
             <PhoneticHighlight word={word} />
-            <p className="text-xl text-slate-400 dark:text-slate-500 font-mono tracking-widest">
-              {word.phonetic}
-            </p>
+            {word.phonetic && (
+              <p className="text-xl text-slate-400 dark:text-slate-500 font-mono tracking-widest">
+                {word.phonetic}
+              </p>
+            )}
             <p className="text-sm text-slate-400 font-medium mt-2">點擊卡片查看中文</p>
           </div>
 
@@ -73,14 +75,20 @@ export function WordCard({ word, isFlipped, onFlip, onSpeak }: WordCardProps) {
               {word.chinese}
             </h2>
 
-            <div className="space-y-3 w-full bg-white/70 dark:bg-black/20 p-5 rounded-2xl shadow-sm">
-              <p className="text-base font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
-                {word.example}
-              </p>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                {word.exampleChinese}
-              </p>
-            </div>
+            {(word.example || word.exampleChinese) && (
+              <div className="space-y-3 w-full bg-white/70 dark:bg-black/20 p-5 rounded-2xl shadow-sm">
+                {word.example && (
+                  <p className="text-base font-medium text-slate-700 dark:text-slate-300 leading-relaxed">
+                    {word.example}
+                  </p>
+                )}
+                {word.exampleChinese && (
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    {word.exampleChinese}
+                  </p>
+                )}
+              </div>
+            )}
           </div>
 
           <Button

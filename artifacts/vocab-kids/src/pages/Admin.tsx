@@ -13,7 +13,7 @@ import { useLocation } from 'wouter';
 import {
   Shield, KeyRound, ArrowRight,
   BarChart3, Users, Star, Target, Gamepad2, RefreshCw, AlertCircle,
-  Sparkles, BookOpen,
+  Sparkles, BookOpen, Settings, Save, Check,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getAllStudentProgress, type StudentProgress } from '@/lib/firestore';
@@ -25,7 +25,13 @@ import { WordExtractResult } from '@/components/admin/WordExtractResult';
 import { WordLibrary } from '@/components/admin/WordLibrary';
 import { analyzeImageForWords, type ExtractedWord } from '@/lib/geminiClient';
 
-const ADMIN_PIN = '0000';
+const PIN_STORAGE_KEY = 'vocab-admin-pin';
+const DEFAULT_PIN = '0220';
+
+function getStoredPin(): string {
+  return localStorage.getItem(PIN_STORAGE_KEY) ?? DEFAULT_PIN;
+}
+
 const CHART_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899', '#14b8a6', '#f97316'];
 
 // ── PIN pad ───────────────────────────────────────────────────────────────────
@@ -41,7 +47,7 @@ function PinPad({ onSuccess }: { onSuccess: () => void }) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (pin === ADMIN_PIN) {
+    if (pin === getStoredPin()) {
       onSuccess();
     } else {
       setError(true);
@@ -96,9 +102,8 @@ function PinPad({ onSuccess }: { onSuccess: () => void }) {
             <ArrowRight className="w-8 h-8" />
           </button>
         </div>
-        <div className="text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
-          <KeyRound className="w-4 h-4" />
-          預設 PIN 碼為 0000
+        <div className="text-center text-sm text-muted-foreground">
+          請輸入您的管理員 PIN 碼
         </div>
       </form>
     </motion.div>
@@ -332,13 +337,114 @@ function GeminiVisionTab() {
 
 // ── Tabs layout ───────────────────────────────────────────────────────────────
 
-type Tab = 'dashboard' | 'vision' | 'library';
+type Tab = 'dashboard' | 'vision' | 'library' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
-  { id: 'dashboard', label: '儀表板', icon: <BarChart3 className="w-4 h-4" /> },
+  { id: 'dashboard', label: '儀表板',  icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'vision',    label: '單字辨識', icon: <Sparkles className="w-4 h-4" /> },
-  { id: 'library',   label: '單字庫', icon: <BookOpen className="w-4 h-4" /> },
+  { id: 'library',   label: '單字庫',  icon: <BookOpen className="w-4 h-4" /> },
+  { id: 'settings',  label: '設定',    icon: <Settings className="w-4 h-4" /> },
 ];
+
+// ── Settings tab ──────────────────────────────────────────────────────────────
+
+function SettingsTab() {
+  const [step, setStep] = useState<'idle' | 'confirm' | 'done'>('idle');
+  const [newPin, setNewPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [activeField, setActiveField] = useState<'new' | 'confirm'>('new');
+  const [err, setErr] = useState('');
+
+  const appendDigit = (n: number) => {
+    if (activeField === 'new' && newPin.length < 4) setNewPin(p => p + n);
+    if (activeField === 'confirm' && confirmPin.length < 4) setConfirmPin(p => p + n);
+  };
+  const clearActive = () => {
+    if (activeField === 'new') setNewPin('');
+    else setConfirmPin('');
+    setErr('');
+  };
+
+  const handleSave = () => {
+    if (newPin.length < 4 || confirmPin.length < 4) { setErr('請輸入完整的 4 位數 PIN 碼'); return; }
+    if (newPin !== confirmPin) { setErr('兩次輸入的 PIN 碼不一致，請重新輸入'); setConfirmPin(''); setActiveField('confirm'); return; }
+    localStorage.setItem(PIN_STORAGE_KEY, newPin);
+    setStep('done');
+    setErr('');
+  };
+
+  if (step === 'done') {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 py-20 text-center">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+          <Check className="w-10 h-10 text-green-500" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-foreground mb-2">PIN 碼已更新</h2>
+          <p className="text-muted-foreground">下次進入後台請使用新的 PIN 碼</p>
+        </div>
+        <button onClick={() => { setStep('idle'); setNewPin(''); setConfirmPin(''); setActiveField('new'); }} className="px-6 py-2 rounded-xl bg-muted font-bold text-sm hover:bg-muted/80">
+          繼續設定
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-sm mx-auto py-6">
+      <h2 className="text-xl font-bold text-foreground mb-6 flex items-center gap-2">
+        <KeyRound className="w-5 h-5 text-primary" />
+        修改管理員 PIN 碼
+      </h2>
+
+      {/* Field selector */}
+      <div className="flex gap-3 mb-6">
+        {(['new', 'confirm'] as const).map(f => (
+          <button
+            key={f}
+            onClick={() => setActiveField(f)}
+            className={`flex-1 p-4 rounded-2xl border-2 text-center transition-all ${activeField === f ? 'border-primary bg-primary/5' : 'border-border bg-muted/40'}`}
+          >
+            <p className="text-xs text-muted-foreground font-bold mb-2 tracking-wider">
+              {f === 'new' ? '新 PIN 碼' : '確認 PIN 碼'}
+            </p>
+            <div className="flex justify-center gap-2">
+              {[0,1,2,3].map(i => (
+                <div key={i} className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-sm font-bold transition-colors ${i < (f === 'new' ? newPin : confirmPin).length ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-muted'}`}>
+                  {i < (f === 'new' ? newPin : confirmPin).length ? '*' : ''}
+                </div>
+              ))}
+            </div>
+          </button>
+        ))}
+      </div>
+
+      {err && <p className="text-center text-destructive text-sm font-bold mb-4">{err}</p>}
+
+      {/* Number pad */}
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {[1,2,3,4,5,6,7,8,9].map(n => (
+          <button key={n} type="button" onClick={() => appendDigit(n)}
+            className="h-14 rounded-2xl bg-muted hover:bg-muted/80 text-xl font-bold transition-transform active:scale-95">
+            {n}
+          </button>
+        ))}
+        <button type="button" onClick={clearActive}
+          className="h-14 rounded-2xl bg-destructive/10 text-destructive hover:bg-destructive/20 font-bold transition-transform active:scale-95">清除</button>
+        <button type="button" onClick={() => appendDigit(0)}
+          className="h-14 rounded-2xl bg-muted hover:bg-muted/80 text-xl font-bold transition-transform active:scale-95">0</button>
+        <button type="button" onClick={handleSave}
+          className="h-14 rounded-2xl bg-primary text-primary-foreground font-bold transition-transform active:scale-95 flex items-center justify-center">
+          <Save className="w-5 h-5" />
+        </button>
+      </div>
+
+      <p className="text-xs text-muted-foreground text-center">
+        設定新的 4 位數 PIN 碼，儲存後立即生效
+      </p>
+    </div>
+  );
+}
 
 function AdminDashboard({ onLock }: { onLock: () => void }) {
   const [tab, setTab] = useState<Tab>('dashboard');
@@ -383,6 +489,7 @@ function AdminDashboard({ onLock }: { onLock: () => void }) {
           {tab === 'dashboard' && <DashboardTab />}
           {tab === 'vision'    && <GeminiVisionTab />}
           {tab === 'library'   && <WordLibrary />}
+          {tab === 'settings'  && <SettingsTab />}
         </motion.div>
       </AnimatePresence>
     </motion.div>

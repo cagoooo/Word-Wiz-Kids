@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, VolumeX, ChevronLeft, ChevronRight, Check, X, RefreshCw, BookOpen, BrainCircuit, Loader2 } from 'lucide-react';
+import { Volume2, VolumeX, ChevronLeft, ChevronRight, Check, X, RefreshCw, BookOpen, BrainCircuit, Loader2, WifiOff } from 'lucide-react';
 import { startBGM, stopBGM, sfxCorrect, sfxWrong, sfxCardFlip } from '@/lib/soundEngine';
 import { useSoundSettings } from '@/hooks/useSoundSettings';
 import { Word } from '@/data/words';
@@ -11,7 +11,7 @@ import { PhoneticHighlight } from '@/components/learn/PhoneticHighlight';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
 
 export default function Learn() {
-  const { words: allWords, categories, loading } = useWordLibrary();
+  const { words: allWords, categories, loading, error: wordError } = useWordLibrary();
   const { muted, toggleMute } = useSoundSettings();
 
   // BGM lifecycle — play while on this page, stop on unmount or mute
@@ -404,6 +404,25 @@ export default function Learn() {
           <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground py-16">
             <Loader2 className="w-10 h-10 animate-spin text-primary" />
             <p className="font-bold tracking-wide">載入單字庫中…</p>
+          </div>
+        ) : wordError ? (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+              <WifiOff className="w-8 h-8 text-destructive" />
+            </div>
+            <p className="font-bold text-foreground text-lg">無法連線到單字庫</p>
+            <p className="text-muted-foreground text-sm max-w-xs">請確認網路連線是否正常，或稍後再試</p>
+            <button onClick={() => window.location.reload()} className="mt-2 px-6 py-2.5 bg-primary text-primary-foreground rounded-full font-bold text-sm hover:opacity-90 active:scale-95 transition-all">
+              重新整理
+            </button>
+          </div>
+        ) : allWords.length === 0 ? (
+          <div className="flex flex-col items-center gap-4 py-16 text-center">
+            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+              <BookOpen className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <p className="font-bold text-foreground text-lg">單字庫目前沒有單字</p>
+            <p className="text-muted-foreground text-sm max-w-xs">請管理員至後台新增單字，孩子才能開始學習</p>
           </div>
         ) : (
           mode === 'browse' ? renderBrowse() : renderReview()

@@ -1,6 +1,6 @@
 import { useReducer, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Play, ArrowLeft, Trophy, Loader2, Volume2, VolumeX } from 'lucide-react';
+import { Star, Play, ArrowLeft, Trophy, Loader2, Volume2, VolumeX, WifiOff, RefreshCw } from 'lucide-react';
 import { Link } from 'wouter';
 import { speakWord } from '@/lib/tts';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
@@ -116,7 +116,7 @@ const DIFFICULTY_LABELS = {
 };
 
 export default function Game() {
-  const { words: allWords, categories, loading } = useWordLibrary();
+  const { words: allWords, categories, loading, error: wordError } = useWordLibrary();
   const { muted, toggleMute } = useSoundSettings();
 
   // Keep a stable ref to allWords so the countdown useEffect can read the
@@ -268,54 +268,106 @@ export default function Game() {
     }, 1500);
   };
 
+  // P0-D: 計算各分類可用單字數
+  const categoryWordCount = (cat: string) =>
+    cat === '全部' ? allWords.length : allWords.filter(w => w.category === cat).length;
+
+  const selectedWordCount = categoryWordCount(state.category);
+  // 四選一題型最少需要 4 個單字
+  const canStart = !loading && !wordError && selectedWordCount >= 4;
+
   const renderSelect = () => (
-    <motion.div 
+    <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="relative z-10 w-full max-w-4xl bg-card/95 backdrop-blur-md rounded-[3rem] border-4 border-white/40 shadow-2xl p-8 md:p-14 text-center mt-8 mx-4"
+      className="relative z-10 w-full max-w-4xl bg-card/95 backdrop-blur-md rounded-[2rem] sm:rounded-[3rem] border-4 border-white/40 shadow-2xl p-5 sm:p-8 md:p-14 text-center mt-4 sm:mt-8 mx-3 sm:mx-4"
     >
-      <Link href="/" className="absolute top-6 left-6 text-muted-foreground hover:text-foreground transition-colors bg-muted p-4 rounded-full shadow-sm hover:scale-105 active:scale-95">
-        <ArrowLeft className="w-8 h-8" />
+      {/* 返回按鈕 */}
+      <Link href="/" className="absolute top-4 left-4 sm:top-6 sm:left-6 text-muted-foreground hover:text-foreground transition-colors bg-muted p-3 sm:p-4 rounded-full shadow-sm hover:scale-105 active:scale-95">
+        <ArrowLeft className="w-6 h-6 sm:w-8 sm:h-8" />
       </Link>
-      
-      <div className="flex justify-center mb-6">
-        <div className="bg-primary/10 p-6 rounded-full text-primary">
-          <Trophy className="w-20 h-20" />
+
+      {/* 靜音按鈕 */}
+      <button
+        onClick={toggleMute}
+        className="absolute top-4 right-4 sm:top-6 sm:right-6 text-muted-foreground hover:text-foreground transition-colors bg-muted p-3 sm:p-4 rounded-full shadow-sm hover:scale-105 active:scale-95"
+        aria-label={muted ? '開啟音效' : '關閉音效'}
+      >
+        {muted ? <VolumeX className="w-6 h-6 sm:w-8 sm:h-8" /> : <Volume2 className="w-6 h-6 sm:w-8 sm:h-8" />}
+      </button>
+
+      <div className="flex justify-center mb-4 sm:mb-6 mt-4">
+        <div className="bg-primary/10 p-4 sm:p-6 rounded-full text-primary">
+          <Trophy className="w-14 h-14 sm:w-20 sm:h-20" />
         </div>
       </div>
-      
-      <h1 className="text-5xl md:text-6xl font-black text-primary mb-14 tracking-widest drop-shadow-sm">
+
+      <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-primary mb-5 sm:mb-10 tracking-widest drop-shadow-sm">
         單字大挑戰
       </h1>
 
-      <div className="mb-12 text-left">
-        <h2 className="text-2xl font-black text-foreground mb-6 flex items-center gap-3">
-          <span className="bg-secondary text-white w-8 h-8 flex items-center justify-center rounded-full text-lg">1</span>
+      {/* P0-C：Firestore 連線失敗提示 */}
+      {wordError && (
+        <div className="mb-6 flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-destructive text-sm font-bold">
+          <WifiOff className="w-5 h-5 shrink-0" />
+          <span>無法連線到單字庫，請確認網路連線後重新整理</span>
+          <button onClick={() => window.location.reload()} className="ml-auto flex items-center gap-1 bg-destructive/10 hover:bg-destructive/20 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap">
+            <RefreshCw className="w-4 h-4" /> 重試
+          </button>
+        </div>
+      )}
+
+      {/* P0-C：單字庫完全空白提示 */}
+      {!loading && !wordError && allWords.length === 0 && (
+        <div className="mb-6 flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-700 text-sm font-bold">
+          <span>目前單字庫沒有單字，請管理員至後台新增單字後再試</span>
+        </div>
+      )}
+
+      {/* 步驟 1：選擇主題 */}
+      <div className="mb-5 sm:mb-10 text-left">
+        <h2 className="text-lg sm:text-2xl font-black text-foreground mb-3 sm:mb-5 flex items-center gap-2 sm:gap-3">
+          <span className="bg-secondary text-white w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full text-sm sm:text-lg shrink-0">1</span>
           選擇主題
         </h2>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {categories.map(cat => (
-            <button
-              key={cat}
-              data-testid={`category-btn-${cat}`}
-              onClick={() => {
-                dispatch({ type: 'SET_CATEGORY', payload: cat });
-                scrollToNext(difficultyRef);
-              }}
-              className={`p-5 rounded-3xl font-black text-2xl border-4 transition-all ${state.category === cat ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
-            >
-              {cat}
-            </button>
-          ))}
+        <div className="grid grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
+          {categories.map(cat => {
+            const count = categoryWordCount(cat);
+            const tooFew = count < 4;
+            return (
+              <button
+                key={cat}
+                data-testid={`category-btn-${cat}`}
+                onClick={() => {
+                  dispatch({ type: 'SET_CATEGORY', payload: cat });
+                  scrollToNext(difficultyRef);
+                }}
+                className={`p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl font-black text-sm sm:text-xl border-4 transition-all flex flex-col items-center gap-0.5 ${state.category === cat ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
+              >
+                <span>{cat}</span>
+                {/* P0-D：顯示該分類單字數 */}
+                <span className={`text-[10px] sm:text-xs font-bold opacity-70 ${tooFew && state.category === cat ? 'text-destructive opacity-100' : ''}`}>
+                  {count} 字
+                </span>
+              </button>
+            );
+          })}
         </div>
+        {/* P0-D：選中的分類不足 4 字時提示 */}
+        {!loading && !wordError && selectedWordCount < 4 && selectedWordCount > 0 && (
+          <p className="mt-3 text-sm text-destructive font-bold flex items-center gap-2">
+            ＊此主題只有 {selectedWordCount} 個單字，至少需要 4 個才能開始遊戲
+          </p>
+        )}
       </div>
 
-      <div ref={difficultyRef} className="mb-16 text-left scroll-mt-8">
-        <h2 className="text-2xl font-black text-foreground mb-6 flex items-center gap-3">
-          <span className="bg-secondary text-white w-8 h-8 flex items-center justify-center rounded-full text-lg">2</span>
+      {/* 步驟 2：選擇難度 */}
+      <div ref={difficultyRef} className="mb-5 sm:mb-10 text-left scroll-mt-8">
+        <h2 className="text-lg sm:text-2xl font-black text-foreground mb-3 sm:mb-5 flex items-center gap-2 sm:gap-3">
+          <span className="bg-secondary text-white w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full text-sm sm:text-lg shrink-0">2</span>
           選擇難度
         </h2>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {(['easy', 'normal', 'hard'] as const).map(diff => (
             <button
               key={diff}
@@ -324,31 +376,39 @@ export default function Game() {
                 dispatch({ type: 'SET_DIFFICULTY', payload: diff });
                 scrollToNext(startBtnRef);
               }}
-              className={`p-6 rounded-3xl font-black text-2xl border-4 transition-all flex flex-col items-center justify-center gap-2 ${state.difficulty === diff ? 'bg-secondary text-secondary-foreground border-secondary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
+              className={`p-3 sm:p-5 rounded-2xl sm:rounded-3xl font-black text-sm sm:text-xl border-4 transition-all flex flex-col items-center justify-center gap-1 ${state.difficulty === diff ? 'bg-secondary text-secondary-foreground border-secondary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
             >
               <span>{DIFFICULTY_LABELS[diff]}</span>
-              <span className="text-lg opacity-80 font-bold">{DIFFICULTY_COUNTS[diff]} 題</span>
+              <span className="text-xs sm:text-sm opacity-80 font-bold">{DIFFICULTY_COUNTS[diff]} 題</span>
             </button>
           ))}
         </div>
       </div>
 
+      {/* 開始遊戲按鈕 */}
       <button
         ref={startBtnRef}
         data-testid="start-game"
-        disabled={loading}
+        disabled={!canStart}
         onClick={() => dispatch({ type: 'START_COUNTDOWN' })}
-        className="w-full py-8 bg-green-500 hover:bg-green-600 active:scale-95 active:translate-y-2 text-white rounded-[3rem] text-4xl font-black shadow-[0_10px_0_rgba(21,128,61,1)] transition-all flex items-center justify-center gap-6 group hover:-translate-y-1 hover:shadow-[0_14px_0_rgba(21,128,61,1)] disabled:opacity-70 disabled:cursor-wait disabled:translate-y-0 disabled:shadow-[0_10px_0_rgba(21,128,61,1)]"
+        className="w-full py-5 sm:py-7 bg-green-500 hover:bg-green-600 active:scale-95 active:translate-y-1 text-white rounded-[2rem] sm:rounded-[3rem] text-2xl sm:text-4xl font-black shadow-[0_8px_0_rgba(21,128,61,1)] sm:shadow-[0_10px_0_rgba(21,128,61,1)] transition-all flex items-center justify-center gap-4 sm:gap-6 group hover:-translate-y-1 hover:shadow-[0_12px_0_rgba(21,128,61,1)] disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
       >
         {loading ? (
           <>
-            <Loader2 className="w-10 h-10 animate-spin" />
+            <Loader2 className="w-8 h-8 sm:w-10 sm:h-10 animate-spin" />
             載入單字庫…
           </>
+        ) : wordError ? (
+          <>
+            <WifiOff className="w-8 h-8 sm:w-10 sm:h-10" />
+            連線失敗
+          </>
+        ) : !canStart && allWords.length > 0 ? (
+          <>單字不足，無法開始</>
         ) : (
           <>
             開始遊戲！
-            <Play className="w-12 h-12 fill-white group-hover:scale-125 transition-transform" />
+            <Play className="w-8 h-8 sm:w-10 sm:h-10 fill-white group-hover:scale-125 transition-transform" />
           </>
         )}
       </button>

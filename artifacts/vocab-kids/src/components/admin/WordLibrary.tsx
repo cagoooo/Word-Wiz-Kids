@@ -67,7 +67,7 @@ export function WordLibrary() {
 
   function startEdit(w: FirestoreWord) {
     setEditingId(w.id);
-    setEditState({ english: w.english, chinese: w.chinese, phonetic: w.phonetic, category: w.category });
+    setEditState({ english: w.english, chinese: w.chinese, phonetic: w.phonetic ?? '', category: w.category });
   }
 
   async function handleUpdate(id: string) {
