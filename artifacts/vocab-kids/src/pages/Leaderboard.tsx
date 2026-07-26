@@ -50,6 +50,7 @@ export default function Leaderboard() {
           setStudent(s);
           setShowNicknameSetup(false);
         }}
+        onSkip={() => setShowNicknameSetup(false)}
       />
 
       <div className="max-w-3xl mx-auto relative z-10">

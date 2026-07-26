@@ -1,15 +1,15 @@
 /**
  * NicknameSetup — modal-style overlay for choosing nickname + avatar.
  * Shown when the student has no nickname yet.
- * All text in Traditional Chinese. No emojis.
+ * Includes a skip button so kids can play without setting a profile.
  */
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User } from 'lucide-react';
+import { X } from 'lucide-react';
 import type { Student } from '@/hooks/useStudent';
 
 const AVATAR_COUNT = 8;
-const AVATAR_COLORS = [
+export const AVATAR_COLORS = [
   'bg-red-400',
   'bg-blue-400',
   'bg-green-400',
@@ -19,15 +19,20 @@ const AVATAR_COLORS = [
   'bg-orange-400',
   'bg-teal-400',
 ];
-const AVATAR_INITIALS = ['貓', '狗', '兔', '熊', '鳥', '魚', '獅', '虎'];
+export const AVATAR_EMOJIS = ['🐱', '🐶', '🐰', '🐻', '🐦', '🐟', '🦁', '🐯'];
+
+/** @deprecated Use AVATAR_EMOJIS instead. Kept for Admin dashboard compatibility. */
+export const AVATAR_INITIALS = AVATAR_EMOJIS;
 
 interface Props {
   open: boolean;
   studentId: string;
   onSave: (student: Student) => void;
+  /** Optional — allows closing without saving a profile. */
+  onSkip?: () => void;
 }
 
-export function NicknameSetup({ open, studentId, onSave }: Props) {
+export function NicknameSetup({ open, studentId, onSave, onSkip }: Props) {
   const [nickname, setNickname] = useState('');
   const [avatar, setAvatar] = useState(1);
 
@@ -52,14 +57,25 @@ export function NicknameSetup({ open, studentId, onSave }: Props) {
             animate={{ scale: 1, y: 0 }}
             exit={{ scale: 0.8, y: 40 }}
             transition={{ type: 'spring', damping: 20, stiffness: 200 }}
-            className="w-full max-w-md bg-card rounded-3xl border-2 border-border shadow-2xl p-8"
+            className="w-full max-w-md bg-card rounded-3xl border-2 border-border shadow-2xl p-8 relative"
           >
+            {/* Skip (close) button */}
+            {onSkip && (
+              <button
+                type="button"
+                onClick={onSkip}
+                className="absolute top-4 right-4 p-2 rounded-full hover:bg-muted transition-colors text-muted-foreground hover:text-foreground"
+                aria-label="跳過"
+                data-testid="nickname-skip"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+
             <div className="text-center mb-6">
-              <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
-                <User className="w-8 h-8 text-primary" />
-              </div>
+              <div className="text-5xl mb-3">🦸</div>
               <h2 className="text-2xl font-black text-foreground">建立你的英雄檔案</h2>
-              <p className="text-muted-foreground mt-1">選一個頭像，再輸入你的名字</p>
+              <p className="text-muted-foreground mt-1">選一個夥伴，再輸入你的名字</p>
             </div>
 
             {/* Avatar grid */}
@@ -69,14 +85,14 @@ export function NicknameSetup({ open, studentId, onSave }: Props) {
                   key={n}
                   type="button"
                   onClick={() => setAvatar(n)}
-                  className={`w-full aspect-square rounded-2xl font-black text-xl text-white transition-all ${AVATAR_COLORS[n - 1]} ${
+                  className={`w-full aspect-square rounded-2xl text-3xl transition-all ${AVATAR_COLORS[n - 1]} ${
                     avatar === n
                       ? 'scale-110 ring-4 ring-primary ring-offset-2 shadow-lg'
-                      : 'opacity-60 hover:opacity-90'
+                      : 'opacity-60 hover:opacity-90 hover:scale-105'
                   }`}
                   data-testid={`avatar-btn-${n}`}
                 >
-                  {AVATAR_INITIALS[n - 1]}
+                  {AVATAR_EMOJIS[n - 1]}
                 </button>
               ))}
             </div>
@@ -89,7 +105,7 @@ export function NicknameSetup({ open, studentId, onSave }: Props) {
                 onChange={(e) => setNickname(e.target.value)}
                 placeholder="輸入你的暱稱（最多 6 個字）"
                 maxLength={6}
-                className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-muted text-foreground text-lg font-bold text-center focus:outline-none focus:border-primary transition-colors mb-4"
+                className="w-full px-4 py-3 rounded-2xl border-2 border-border bg-muted text-foreground text-lg font-bold text-center focus:outline-none focus:border-primary transition-colors mb-3"
                 data-testid="nickname-input"
                 autoFocus
               />
@@ -101,6 +117,16 @@ export function NicknameSetup({ open, studentId, onSave }: Props) {
               >
                 出發冒險！
               </button>
+              {onSkip && (
+                <button
+                  type="button"
+                  onClick={onSkip}
+                  className="w-full mt-3 py-2 text-muted-foreground hover:text-foreground text-sm font-bold transition-colors"
+                  data-testid="nickname-skip-bottom"
+                >
+                  先跳過，直接玩遊戲
+                </button>
+              )}
             </form>
           </motion.div>
         </motion.div>
@@ -108,5 +134,3 @@ export function NicknameSetup({ open, studentId, onSave }: Props) {
     </AnimatePresence>
   );
 }
-
-export { AVATAR_COLORS, AVATAR_INITIALS };
