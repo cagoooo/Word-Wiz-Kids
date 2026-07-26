@@ -1,9 +1,9 @@
 import { useReducer, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Play, ArrowLeft, Trophy } from 'lucide-react';
+import { Star, Play, ArrowLeft, Trophy, Loader2 } from 'lucide-react';
 import { Link } from 'wouter';
-import { CATEGORIES, MOCK_WORDS } from '@/data/words';
 import { speakWord } from '@/lib/tts';
+import { useWordLibrary } from '@/hooks/useWordLibrary';
 import { Confetti } from '@/components/game/Confetti';
 import { AnswerButton } from '@/components/game/AnswerButton';
 import { generateQuestions, calcScore, getStarRating, Question } from '@/lib/gameUtils';
@@ -110,6 +110,13 @@ const DIFFICULTY_LABELS = {
 };
 
 export default function Game() {
+  const { words: allWords, categories, loading } = useWordLibrary();
+
+  // Keep a stable ref to allWords so the countdown useEffect can read the
+  // latest value without being re-triggered every time allWords changes.
+  const allWordsRef = useRef(allWords);
+  useEffect(() => { allWordsRef.current = allWords; }, [allWords]);
+
   const [state, dispatch] = useReducer(gameReducer, {
     phase: 'select',
     category: '全部',
@@ -143,9 +150,9 @@ export default function Game() {
       const timer2 = setTimeout(() => setCountdown(1), 2000);
       const timer1 = setTimeout(() => setCountdown(0), 3000);
       const timerStart = setTimeout(() => {
-        const words = state.category === '全部' 
-          ? MOCK_WORDS 
-          : MOCK_WORDS.filter(w => w.category === state.category);
+        const words = state.category === '全部'
+          ? allWordsRef.current
+          : allWordsRef.current.filter(w => w.category === state.category);
         const q = generateQuestions(words, DIFFICULTY_COUNTS[state.difficulty]);
         dispatch({ type: 'START_GAME', payload: q });
       }, 4000);
@@ -259,7 +266,7 @@ export default function Game() {
           選擇主題
         </h2>
         <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {CATEGORIES.map(cat => (
+          {categories.map(cat => (
             <button
               key={cat}
               data-testid={`category-btn-${cat}`}
@@ -294,11 +301,21 @@ export default function Game() {
 
       <button
         data-testid="start-game"
+        disabled={loading}
         onClick={() => dispatch({ type: 'START_COUNTDOWN' })}
-        className="w-full py-8 bg-green-500 hover:bg-green-600 active:scale-95 active:translate-y-2 text-white rounded-[3rem] text-4xl font-black shadow-[0_10px_0_rgba(21,128,61,1)] transition-all flex items-center justify-center gap-6 group hover:-translate-y-1 hover:shadow-[0_14px_0_rgba(21,128,61,1)]"
+        className="w-full py-8 bg-green-500 hover:bg-green-600 active:scale-95 active:translate-y-2 text-white rounded-[3rem] text-4xl font-black shadow-[0_10px_0_rgba(21,128,61,1)] transition-all flex items-center justify-center gap-6 group hover:-translate-y-1 hover:shadow-[0_14px_0_rgba(21,128,61,1)] disabled:opacity-70 disabled:cursor-wait disabled:translate-y-0 disabled:shadow-[0_10px_0_rgba(21,128,61,1)]"
       >
-        開始遊戲！
-        <Play className="w-12 h-12 fill-white group-hover:scale-125 transition-transform" />
+        {loading ? (
+          <>
+            <Loader2 className="w-10 h-10 animate-spin" />
+            載入單字庫…
+          </>
+        ) : (
+          <>
+            開始遊戲！
+            <Play className="w-12 h-12 fill-white group-hover:scale-125 transition-transform" />
+          </>
+        )}
       </button>
     </motion.div>
   );

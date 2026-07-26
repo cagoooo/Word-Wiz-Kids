@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, ChevronLeft, ChevronRight, Check, X, RefreshCw, BookOpen, BrainCircuit } from 'lucide-react';
-import { CATEGORIES, MOCK_WORDS, Word } from '@/data/words';
+import { Volume2, ChevronLeft, ChevronRight, Check, X, RefreshCw, BookOpen, BrainCircuit, Loader2 } from 'lucide-react';
+import { Word } from '@/data/words';
 import { speakWord, isTTSSupported } from '@/lib/tts';
 import { WordCard } from '@/components/learn/WordCard';
 import { Button } from '@/components/ui/button';
 import { PhoneticHighlight } from '@/components/learn/PhoneticHighlight';
+import { useWordLibrary } from '@/hooks/useWordLibrary';
 
 export default function Learn() {
+  const { words: allWords, categories, loading } = useWordLibrary();
+
   const [mode, setMode] = useState<"browse" | "review">("browse");
   const [category, setCategory] = useState<string>("全部");
 
@@ -23,15 +26,15 @@ export default function Learn() {
   const [knownCount, setKnownCount] = useState(0);
 
   const browseWords = category === "全部"
-    ? MOCK_WORDS
-    : MOCK_WORDS.filter(w => w.category === category);
+    ? allWords
+    : allWords.filter(w => w.category === category);
 
   const currentBrowseWord = browseWords[currentIndex];
 
   const startReview = () => {
     const words = category === "全部"
-      ? MOCK_WORDS
-      : MOCK_WORDS.filter(w => w.category === category);
+      ? allWords
+      : allWords.filter(w => w.category === category);
     const shuffled = [...words].sort(() => Math.random() - 0.5);
     setReviewWords(shuffled);
     setReviewIndex(0);
@@ -326,7 +329,7 @@ export default function Learn() {
 
       {/* Category filter */}
       <div className="flex flex-wrap gap-2 mb-8 justify-center">
-        {CATEGORIES.map(cat => (
+        {categories.map(cat => (
           <button
             key={cat}
             onClick={() => setCategory(cat)}
@@ -345,7 +348,15 @@ export default function Learn() {
         </div>
       )}
 
-      {mode === 'browse' ? renderBrowse() : renderReview()}
+      {/* Loading state */}
+      {loading ? (
+        <div className="flex-1 flex flex-col items-center justify-center gap-4 text-muted-foreground">
+          <Loader2 className="w-10 h-10 animate-spin text-primary" />
+          <p className="font-bold tracking-wide">載入單字庫中…</p>
+        </div>
+      ) : (
+        mode === 'browse' ? renderBrowse() : renderReview()
+      )}
     </div>
   );
 }
