@@ -1,0 +1,154 @@
+/**
+ * Firestore CRUD for the `words` collection.
+ * Words here augment (and can override) the static MOCK_WORDS.
+ * All operations check isFirebaseConfigured — no-ops when offline.
+ */
+import {
+  collection,
+  doc,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  getDocs,
+  query,
+  orderBy,
+  serverTimestamp,
+  writeBatch,
+} from 'firebase/firestore';
+import { db, isFirebaseConfigured } from './firebase';
+import type { Word } from '@/data/words';
+
+export interface FirestoreWord extends Omit<Word, 'vowels' | 'diphthongs'> {
+  id: string;
+  vowels: number[];
+  diphthongs: { start: number; length: number }[];
+  createdAt?: unknown;
+  updatedAt?: unknown;
+}
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+/** Auto-compute vowel positions for a word. */
+function computeVowels(english: string): number[] {
+  const vowelChars = new Set(['a', 'e', 'i', 'o', 'u']);
+  return english
+    .toLowerCase()
+    .split('')
+    .map((ch, i) => (vowelChars.has(ch) ? i : -1))
+    .filter((i) => i >= 0);
+}
+
+/** Auto-compute common English diphthong positions. */
+function computeDiphthongs(english: string): { start: number; length: number }[] {
+  const diphthongPatterns = ['ai', 'ay', 'ee', 'ea', 'ie', 'oa', 'oo', 'ou', 'ow', 'oi', 'oy', 'au', 'aw', 'ew', 'ue', 'ui'];
+  const lower = english.toLowerCase();
+  const result: { start: number; length: number }[] = [];
+  const covered = new Set<number>();
+
+  for (const pattern of diphthongPatterns) {
+    let idx = lower.indexOf(pattern);
+    while (idx >= 0) {
+      if (!covered.has(idx)) {
+        result.push({ start: idx, length: pattern.length });
+        covered.add(idx);
+        covered.add(idx + 1);
+      }
+      idx = lower.indexOf(pattern, idx + 1);
+    }
+  }
+  return result.sort((a, b) => a.start - b.start);
+}
+
+/** Convert a partial word spec to a full FirestoreWord. */
+export function buildWordRecord(params: {
+  english: string;
+  chinese: string;
+  phonetic: string;
+  category: string;
+  example?: string;
+  exampleChinese?: string;
+}): Omit<FirestoreWord, 'id' | 'createdAt' | 'updatedAt'> {
+  return {
+    english: params.english,
+    chinese: params.chinese,
+    phonetic: params.phonetic,
+    category: params.category,
+    example: params.example ?? `I see a ${params.english}.`,
+    exampleChinese: params.exampleChinese ?? `我看到一個${params.chinese}。`,
+    vowels: computeVowels(params.english),
+    diphthongs: computeDiphthongs(params.english),
+  };
+}
+
+// ── CRUD ──────────────────────────────────────────────────────────────────────
+
+export async function getAllWords(): Promise<FirestoreWord[]> {
+  if (!isFirebaseConfigured || !db) return [];
+  const q = query(collection(db, 'words'), orderBy('category'), orderBy('english'));
+  const snap = await getDocs(q);
+  return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreWord));
+}
+
+export async function addWord(
+  params: Parameters<typeof buildWordRecord>[0],
+): Promise<FirestoreWord> {
+  if (!isFirebaseConfigured || !db) {
+    throw new Error('Firebase 未設定');
+  }
+  const record = buildWordRecord(params);
+  const ref = await addDoc(collection(db, 'words'), {
+    ...record,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp(),
+  });
+  return { id: ref.id, ...record };
+}
+
+export async function updateWord(
+  id: string,
+  params: Partial<Parameters<typeof buildWordRecord>[0]>,
+): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  const ref = doc(db, 'words', id);
+  const update: Record<string, unknown> = { updatedAt: serverTimestamp() };
+  if (params.english !== undefined) {
+    update.english = params.english;
+    update.vowels = computeVowels(params.english);
+    update.diphthongs = computeDiphthongs(params.english);
+  }
+  if (params.chinese !== undefined) update.chinese = params.chinese;
+  if (params.phonetic !== undefined) update.phonetic = params.phonetic;
+  if (params.category !== undefined) update.category = params.category;
+  if (params.example !== undefined) update.example = params.example;
+  if (params.exampleChinese !== undefined) update.exampleChinese = params.exampleChinese;
+  await updateDoc(ref, update);
+}
+
+export async function deleteWord(id: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  await deleteDoc(doc(db, 'words', id));
+}
+
+/** Batch-add multiple words (from Gemini recognition results). */
+export async function batchAddWords(
+  words: Parameters<typeof buildWordRecord>[0][],
+): Promise<FirestoreWord[]> {
+  if (!isFirebaseConfigured || !db) {
+    throw new Error('Firebase 未設定');
+  }
+  const batch = writeBatch(db);
+  const refs: { id: string; record: ReturnType<typeof buildWordRecord> }[] = [];
+
+  for (const params of words) {
+    const record = buildWordRecord(params);
+    const ref = doc(collection(db, 'words'));
+    batch.set(ref, {
+      ...record,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    });
+    refs.push({ id: ref.id, record });
+  }
+  await batch.commit();
+  return refs.map(({ id, record }) => ({ id, ...record }));
+}
