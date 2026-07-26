@@ -6,7 +6,7 @@
 import { useState, useEffect } from 'react';
 import { MOCK_WORDS, CATEGORIES } from '@/data/words';
 import type { Word } from '@/data/words';
-import { getAllWords } from '@/lib/firestoreWords';
+import { subscribeWords } from '@/lib/firestoreWords';
 import { isFirebaseConfigured } from '@/lib/firebase';
 
 export interface WordLibrary {
@@ -25,37 +25,34 @@ export function useWordLibrary(): WordLibrary {
       return;
     }
 
-    let cancelled = false;
     setLoading(true);
 
-    getAllWords()
-      .then((fetched) => {
-        if (!cancelled) {
-          setFirestoreWords(
-            fetched.map((fw) => ({
-              id: fw.id,
-              english: fw.english,
-              chinese: fw.chinese,
-              phonetic: fw.phonetic,
-              category: fw.category,
-              example: fw.example,
-              exampleChinese: fw.exampleChinese,
-              vowels: fw.vowels ?? [],
-              diphthongs: fw.diphthongs ?? [],
-            }))
-          );
-        }
-      })
-      .catch(() => {
+    const unsubscribe = subscribeWords(
+      (fetched) => {
+        setFirestoreWords(
+          fetched.map((fw) => ({
+            id: fw.id,
+            english: fw.english,
+            chinese: fw.chinese,
+            phonetic: fw.phonetic,
+            category: fw.category,
+            example: fw.example,
+            exampleChinese: fw.exampleChinese,
+            vowels: fw.vowels ?? [],
+            diphthongs: fw.diphthongs ?? [],
+          }))
+        );
+        setLoading(false);
+      },
+      () => {
         // Network / permission error — fall back silently to MOCK_WORDS
-        if (!cancelled) setFirestoreWords([]);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
+        setFirestoreWords([]);
+        setLoading(false);
+      },
+    );
 
     return () => {
-      cancelled = true;
+      unsubscribe();
     };
   }, []);
 

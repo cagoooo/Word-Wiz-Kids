@@ -10,10 +10,12 @@ import {
   updateDoc,
   deleteDoc,
   getDocs,
+  onSnapshot,
   query,
   orderBy,
   serverTimestamp,
   writeBatch,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './firebase';
 import type { Word } from '@/data/words';
@@ -87,6 +89,32 @@ export async function getAllWords(): Promise<FirestoreWord[]> {
   const q = query(collection(db, 'words'), orderBy('category'), orderBy('english'));
   const snap = await getDocs(q);
   return snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreWord));
+}
+
+/**
+ * Subscribe to real-time updates for the words collection.
+ * Calls `onUpdate` whenever a word is added, modified, or deleted.
+ * Returns an unsubscribe function — call it on cleanup.
+ */
+export function subscribeWords(
+  onUpdate: (words: FirestoreWord[]) => void,
+  onError?: (err: Error) => void,
+): Unsubscribe {
+  if (!isFirebaseConfigured || !db) {
+    // No-op: immediately return a no-op unsubscribe
+    return () => {};
+  }
+  const q = query(collection(db, 'words'), orderBy('category'), orderBy('english'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const words = snap.docs.map((d) => ({ id: d.id, ...d.data() } as FirestoreWord));
+      onUpdate(words);
+    },
+    (err) => {
+      onError?.(err);
+    },
+  );
 }
 
 export async function addWord(
