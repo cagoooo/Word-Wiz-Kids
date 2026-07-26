@@ -117,6 +117,22 @@ export function subscribeWords(
   );
 }
 
+/** Wraps any Firestore promise with a 15-second timeout that surfaces a clear rules error. */
+function withFirestoreTimeout<T>(promise: Promise<T>): Promise<T> {
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            'PERMISSION_DENIED：Firestore 安全規則拒絕寫入。\n請至 Firebase Console → Firestore Database → 規則，確認允許寫入（測試模式）。',
+          ),
+        ),
+      15000,
+    ),
+  );
+  return Promise.race([promise, timeout]);
+}
+
 export async function addWord(
   params: Parameters<typeof buildWordRecord>[0],
 ): Promise<FirestoreWord> {
@@ -124,11 +140,13 @@ export async function addWord(
     throw new Error('Firebase 未設定');
   }
   const record = buildWordRecord(params);
-  const ref = await addDoc(collection(db, 'words'), {
-    ...record,
-    createdAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
-  });
+  const ref = await withFirestoreTimeout(
+    addDoc(collection(db, 'words'), {
+      ...record,
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    }),
+  );
   return { id: ref.id, ...record };
 }
 
@@ -149,12 +167,12 @@ export async function updateWord(
   if (params.category !== undefined) update.category = params.category;
   if (params.example !== undefined) update.example = params.example;
   if (params.exampleChinese !== undefined) update.exampleChinese = params.exampleChinese;
-  await updateDoc(ref, update);
+  await withFirestoreTimeout(updateDoc(ref, update));
 }
 
 export async function deleteWord(id: string): Promise<void> {
   if (!isFirebaseConfigured || !db) return;
-  await deleteDoc(doc(db, 'words', id));
+  await withFirestoreTimeout(deleteDoc(doc(db, 'words', id)));
 }
 
 /** Batch-add multiple words (from Gemini recognition results). */
@@ -177,6 +195,20 @@ export async function batchAddWords(
     });
     refs.push({ id: ref.id, record });
   }
-  await batch.commit();
+
+  // Timeout after 15s — Firestore hangs silently when security rules block writes
+  const timeout = new Promise<never>((_, reject) =>
+    setTimeout(
+      () =>
+        reject(
+          new Error(
+            'PERMISSION_DENIED：Firestore 安全規則拒絕寫入。\n請至 Firebase Console → Firestore Database → 規則，確認允許寫入（測試模式：allow read, write: if true）。',
+          ),
+        ),
+      15000,
+    ),
+  );
+
+  await Promise.race([batch.commit(), timeout]);
   return refs.map(({ id, record }) => ({ id, ...record }));
 }

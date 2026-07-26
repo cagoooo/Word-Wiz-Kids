@@ -93,7 +93,7 @@ export function WordExtractResult({ words: initialWords, onSaved, onReset }: Pro
       {error && (
         <div className="flex items-start gap-3 p-4 bg-destructive/10 border border-destructive/30 rounded-2xl text-destructive text-sm">
           <AlertCircle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-          {error}
+          <span className="whitespace-pre-line">{error}</span>
         </div>
       )}
 
