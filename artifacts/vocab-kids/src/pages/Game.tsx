@@ -135,6 +135,16 @@ export default function Game() {
   const timerStartRef = useRef<number>(0);
   const timerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Auto-scroll refs for the 3-step select screen
+  const difficultyRef = useRef<HTMLDivElement>(null);
+  const startBtnRef = useRef<HTMLButtonElement>(null);
+
+  function scrollToNext(ref: React.RefObject<HTMLElement | null>) {
+    setTimeout(() => {
+      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 120);
+  }
+
   const QUESTION_TIME_MS = 10000;
 
   useEffect(() => {
@@ -272,7 +282,10 @@ export default function Game() {
             <button
               key={cat}
               data-testid={`category-btn-${cat}`}
-              onClick={() => dispatch({ type: 'SET_CATEGORY', payload: cat })}
+              onClick={() => {
+                dispatch({ type: 'SET_CATEGORY', payload: cat });
+                scrollToNext(difficultyRef);
+              }}
               className={`p-5 rounded-3xl font-black text-2xl border-4 transition-all ${state.category === cat ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
             >
               {cat}
@@ -281,7 +294,7 @@ export default function Game() {
         </div>
       </div>
 
-      <div className="mb-16 text-left">
+      <div ref={difficultyRef} className="mb-16 text-left scroll-mt-8">
         <h2 className="text-2xl font-black text-foreground mb-6 flex items-center gap-3">
           <span className="bg-secondary text-white w-8 h-8 flex items-center justify-center rounded-full text-lg">2</span>
           選擇難度
@@ -291,7 +304,10 @@ export default function Game() {
             <button
               key={diff}
               data-testid={`difficulty-${diff}`}
-              onClick={() => dispatch({ type: 'SET_DIFFICULTY', payload: diff })}
+              onClick={() => {
+                dispatch({ type: 'SET_DIFFICULTY', payload: diff });
+                scrollToNext(startBtnRef);
+              }}
               className={`p-6 rounded-3xl font-black text-2xl border-4 transition-all flex flex-col items-center justify-center gap-2 ${state.difficulty === diff ? 'bg-secondary text-secondary-foreground border-secondary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
             >
               <span>{DIFFICULTY_LABELS[diff]}</span>
@@ -302,6 +318,7 @@ export default function Game() {
       </div>
 
       <button
+        ref={startBtnRef}
         data-testid="start-game"
         disabled={loading}
         onClick={() => dispatch({ type: 'START_COUNTDOWN' })}
