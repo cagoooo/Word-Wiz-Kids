@@ -64,6 +64,8 @@ export default defineConfig({
       '@radix-ui/react-slot',
       '@radix-ui/react-tooltip',
       '@radix-ui/react-toast',
+      'firebase/app',
+      'firebase/firestore',
     ],
   },
   root: path.resolve(import.meta.dirname),

@@ -7,6 +7,8 @@ import { speakWord } from '@/lib/tts';
 import { Confetti } from '@/components/game/Confetti';
 import { AnswerButton } from '@/components/game/AnswerButton';
 import { generateQuestions, calcScore, getStarRating, Question } from '@/lib/gameUtils';
+import { submitScore } from '@/lib/firestore';
+import { loadStudent, getOrCreateStudentId } from '@/hooks/useStudent';
 
 type GamePhase = 'select' | 'countdown' | 'question' | 'results';
 
@@ -184,6 +186,28 @@ export default function Game() {
     }
     return undefined;
   }, [state.phase, state.currentQuestionIndex, state.selectedOptionIndex, state.questions]);
+
+  // Submit score to Firestore when game ends
+  useEffect(() => {
+    if (state.phase !== 'results' || state.questions.length === 0) return undefined;
+    const student = loadStudent();
+    const studentId = getOrCreateStudentId();
+    const nickname = student?.nickname || '無名英雄';
+    const avatar = student?.avatar ?? 1;
+    submitScore({
+      studentId,
+      nickname,
+      avatar,
+      score: state.score,
+      category: state.category,
+      difficulty: state.difficulty,
+      correctCount: state.correctCount,
+      totalQuestions: state.questions.length,
+    }).catch(() => {
+      // Firebase not configured or network error — silent fallback
+    });
+    return undefined;
+  }, [state.phase]); // Only trigger when phase changes to 'results'
 
   const handleAnswer = (index: number) => {
     if (state.selectedOptionIndex !== null) return;
