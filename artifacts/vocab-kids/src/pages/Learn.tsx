@@ -139,7 +139,7 @@ export default function Learn() {
             <ChevronLeft className="w-8 h-8" />
           </Button>
 
-          <div className="w-full max-w-md">
+          <div className="w-full max-w-md shrink-0 flex justify-center">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentBrowseWord.id}
@@ -147,6 +147,7 @@ export default function Learn() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -20 }}
                 transition={{ duration: 0.2 }}
+                className="w-full flex justify-center"
               >
                 <WordCard
                   word={currentBrowseWord}

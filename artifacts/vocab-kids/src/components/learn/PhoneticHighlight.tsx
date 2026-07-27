@@ -4,7 +4,7 @@ export function PhoneticHighlight({ word }: { word: Word }) {
   const letters = word.english.split('');
   
   return (
-    <div className="flex justify-center" data-testid="phonetic-highlight">
+    <div className="flex justify-center flex-wrap max-w-full gap-1" data-testid="phonetic-highlight">
       {letters.map((char, index) => {
         const inDiphthong = word.diphthongs.some(
           d => index >= d.start && index < d.start + d.length
