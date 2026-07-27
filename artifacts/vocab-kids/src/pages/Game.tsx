@@ -572,6 +572,13 @@ export default function Game() {
                   ? speakWord(q.word.english)
                   : speakText(q.word.chinese)
               }
+              onMouseEnter={() => {
+                if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
+                  q.direction === 'en_to_zh'
+                    ? speakWord(q.word.english)
+                    : speakText(q.word.chinese);
+                }
+              }}
               className="mt-2 sm:mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs sm:text-sm font-bold transition-all hover:scale-105 active:scale-95 border border-primary/20"
               title="重新播放發音"
             >
@@ -609,7 +616,8 @@ export default function Game() {
         {/* Answers Grid */}
         <div className="w-full shrink-0 mt-auto flex flex-col gap-1.5">
           <div className="text-center text-xs sm:text-sm font-bold text-white/90 drop-shadow mb-1 flex items-center justify-center gap-1">
-            <span>💡 點擊選項先聽發音，再按一次確認答案！</span>
+            <span className="hidden md:inline">💡 移到選項自動聽發音，點擊選項先確認，再按一次提交！</span>
+            <span className="md:hidden">💡 點擊選項先聽發音，再按一次確認答案！</span>
           </div>
           <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-5 w-full">
             {q.options.map((opt, i) => {
@@ -633,6 +641,7 @@ export default function Game() {
                   isPendingConfirm={pendingIndex === i}
                   disabled={disabled}
                   onClick={() => handleOptionClick(i)}
+                  onHoverSpeak={() => speakText(optionLabel)}
                   testId={`answer-btn-${i}`}
                 />
               );
