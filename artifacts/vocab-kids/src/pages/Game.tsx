@@ -293,6 +293,7 @@ export default function Game() {
     }, 1500);
   };
 
+
   const handleOptionClick = (index: number) => {
     if (state.selectedOptionIndex !== null) return;
     const q = state.questions[state.currentQuestionIndex];
@@ -301,16 +302,27 @@ export default function Game() {
     const opt = q.options[index];
     const optionLabel = q.direction === 'en_to_zh' ? opt.chinese : opt.english;
 
-    if (pendingIndex !== index) {
-      // First click: select + speak TTS发音
-      setPendingIndex(index);
-      speakText(optionLabel);
-    } else {
-      // Second click: confirm answer
+    // 桌機（支援 hover 的精準指標裝置）：hover 已播放 TTS，點擊直接提交
+    const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+    if (isDesktop) {
+      // 桌機：單擊直接確認答案
       setPendingIndex(null);
       handleAnswer(index);
+    } else {
+      // 手機 / 平板：兩階段確認
+      // 第一下：播放 TTS 發音，顯示「再按一次確認！」提示
+      // 第二下：同一個選項 → 提交答案
+      if (pendingIndex !== index) {
+        setPendingIndex(index);
+        speakText(optionLabel);
+      } else {
+        setPendingIndex(null);
+        handleAnswer(index);
+      }
     }
   };
+
 
   // P0-D: 計算各分類可用單字數
   const categoryWordCount = (cat: string) =>
