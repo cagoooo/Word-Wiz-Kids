@@ -121,7 +121,7 @@ export default function ArenaPlayer() {
         <div className="w-full max-w-md text-center">
           <div className="mb-6 p-4 rounded-2xl bg-card border border-border shadow-sm">
             <p className="text-xs text-muted-foreground font-bold mb-1">題目 {room.currentQuestionIndex + 1}</p>
-            <h3 className="text-3xl font-black text-primary">{currentQ.english}</h3>
+            <h3 className="text-3xl font-black text-primary">{currentQ.word.english}</h3>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

@@ -34,7 +34,7 @@ export function generatePin(): string {
 
 export async function createArenaRoom(category: string = '全部'): Promise<string> {
   const pin = generatePin();
-  const questions = generateQuestions(MOCK_WORDS, 5, 'normal');
+  const questions = generateQuestions(MOCK_WORDS, 5, 'random' as const);
 
   const roomData: ArenaRoom = {
     pin,

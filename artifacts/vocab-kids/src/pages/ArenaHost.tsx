@@ -130,9 +130,9 @@ export default function ArenaHost() {
           </div>
 
           <div className="py-8 bg-muted/40 rounded-3xl border border-border mb-8">
-            <h2 className="text-4xl font-black text-primary mb-3">{currentQ.english}</h2>
-            {currentQ.phonetic && <p className="text-lg font-mono text-muted-foreground mb-4">{currentQ.phonetic}</p>}
-            <AudioButton text={currentQ.english} size="lg" />
+            <h2 className="text-4xl font-black text-primary mb-3">{currentQ.word.english}</h2>
+            {currentQ.word.phonetic && <p className="text-lg font-mono text-muted-foreground mb-4">{currentQ.word.phonetic}</p>}
+            <AudioButton text={currentQ.word.english} size="lg" />
           </div>
 
           {/* Option Answer Color Display */}

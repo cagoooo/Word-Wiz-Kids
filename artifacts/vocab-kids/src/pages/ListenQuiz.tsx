@@ -1,4 +1,4 @@
-﻿/**
+/**
  * P1-C: 聽力填空測驗模式
  * 純音訊播放，訓練「聽→辨」能力
  */
@@ -32,7 +32,11 @@ function generateListenQuestions(words: Word[], count: number): ListenQuestion[]
 }
 
 export default function ListenQuiz() {
-  const { words: allWords, categories, loading } = useWordLibrary();
+  const { words: allWords, categories, loading } = useWordLibrary() as unknown as {
+    words: Word[];
+    categories: string[];
+    loading: boolean;
+  };
   const [phase, setPhase] = useState<Phase>('select');
   const [category, setCategory] = useState('全部');
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
@@ -43,7 +47,7 @@ export default function ListenQuiz() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
 
-  const COUNTS = { easy: 6, normal: 10, hard: 15 };
+  const COUNTS: Record<string, number> = { easy: 6, normal: 10, hard: 15 };
   const filteredWords = category === '全部' ? allWords : allWords.filter(w => w.category === category);
   const canStart = filteredWords.length >= 4;
 
@@ -61,11 +65,10 @@ export default function ListenQuiz() {
     if (!questions[currentIdx]) return;
     setIsPlaying(true);
     setHasPlayed(true);
-    speakWord(questions[currentIdx].word.english, 0.75);
+    speakWord(questions[currentIdx].word.english, 'en-US');
     setTimeout(() => setIsPlaying(false), 1500);
   }, [questions, currentIdx]);
 
-  // Auto-play when question changes
   useEffect(() => {
     if (phase === 'playing' && questions[currentIdx]) {
       setSelected(null);
@@ -73,7 +76,9 @@ export default function ListenQuiz() {
       const timer = setTimeout(() => playCurrentWord(), 600);
       return () => clearTimeout(timer);
     }
-  }, [currentIdx, phase]);
+    return undefined;
+  }, [currentIdx, phase, playCurrentWord, questions]);
+
 
   const handleAnswer = (idx: number) => {
     if (selected !== null) return;
@@ -99,10 +104,10 @@ export default function ListenQuiz() {
   };
 
   const ANSWER_COLORS = [
-    'from-red-400 to-rose-500 shadow-rose-300',
-    'from-blue-400 to-indigo-500 shadow-blue-300',
-    'from-yellow-400 to-amber-500 shadow-amber-300',
-    'from-green-400 to-emerald-500 shadow-green-300',
+    'from-red-400 to-rose-500',
+    'from-blue-400 to-indigo-500',
+    'from-yellow-400 to-amber-500',
+    'from-green-400 to-emerald-500',
   ];
 
   const SLOT_EMOJIS = ['🔴', '🔵', '🟡', '🟢'];
@@ -130,24 +135,38 @@ export default function ListenQuiz() {
         <UserExpBar />
 
         <div className="mt-6 bg-white rounded-3xl p-6 shadow-lg border border-blue-100 space-y-6">
-          {/* Category */}
           <div>
             <h2 className="font-black text-lg mb-3">選擇主題</h2>
             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
               {['全部', ...categories].map(cat => (
-                <button key={cat} onClick={() => setCategory(cat)} className={py-2 px-3 rounded-2xl font-bold text-sm border-2 transition-all }>
+                <button
+                  key={cat}
+                  onClick={() => setCategory(cat)}
+                  className={`py-2 px-3 rounded-2xl font-bold text-sm border-2 transition-all ${
+                    category === cat
+                      ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-md'
+                      : 'bg-white text-foreground border-border hover:bg-blue-50'
+                  }`}
+                >
                   {cat}
                 </button>
               ))}
             </div>
           </div>
 
-          {/* Difficulty */}
           <div>
             <h2 className="font-black text-lg mb-3">選擇難度</h2>
             <div className="grid grid-cols-3 gap-3">
               {(['easy', 'normal', 'hard'] as const).map(d => (
-                <button key={d} onClick={() => setDifficulty(d)} className={py-3 rounded-2xl font-bold border-2 transition-all }>
+                <button
+                  key={d}
+                  onClick={() => setDifficulty(d)}
+                  className={`py-3 rounded-2xl font-bold border-2 transition-all text-sm ${
+                    difficulty === d
+                      ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-md'
+                      : 'bg-white text-foreground border-border hover:bg-blue-50'
+                  }`}
+                >
                   {d === 'easy' ? '😊 簡單 (6題)' : d === 'normal' ? '🎯 正常 (10題)' : '🔥 挑戰 (15題)'}
                 </button>
               ))}
@@ -175,20 +194,32 @@ export default function ListenQuiz() {
     const expEarned = correctCount * 5 + (correctCount === questions.length ? 20 : 0);
     return (
       <div className="min-h-[100dvh] bg-gradient-to-br from-cyan-50 to-indigo-50 flex items-center justify-center p-4">
-        <motion.div initial={{ opacity: 0, scale: 0.8 }} animate={{ opacity: 1, scale: 1 }} className="bg-white rounded-3xl p-8 shadow-2xl border-4 border-blue-200 text-center max-w-md w-full">
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="bg-white rounded-3xl p-8 shadow-2xl border-4 border-blue-200 text-center max-w-md w-full"
+        >
           <h1 className="text-4xl font-black mb-6">🎧 聽力結算</h1>
           <div className="flex justify-center gap-3 mb-6">
-            {[1,2,3].map(s => <Star key={s} className={w-16 h-16 } />)}
+            {[1, 2, 3].map(s => (
+              <Star key={s} className={`w-16 h-16 ${s <= stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-200'}`} />
+            ))}
           </div>
           <div className="bg-blue-50 rounded-2xl p-5 mb-6 space-y-2">
             <p className="text-3xl font-black text-blue-700">答對 {correctCount} / {questions.length} 題</p>
             <p className="text-lg font-bold text-yellow-600">✨ 獲得 +{expEarned} EXP</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={startGame} className="flex-1 py-4 bg-blue-500 text-white rounded-2xl font-black hover:bg-blue-600 transition-colors flex items-center justify-center gap-2">
+            <button
+              onClick={startGame}
+              className="flex-1 py-4 bg-blue-500 text-white rounded-2xl font-black hover:bg-blue-600 transition-colors flex items-center justify-center gap-2"
+            >
               <RotateCcw className="w-5 h-5" /> 再玩一次
             </button>
-            <Link href="/" className="flex-1 py-4 bg-white border-2 border-border text-foreground rounded-2xl font-black hover:bg-gray-50 transition-colors flex items-center justify-center gap-2">
+            <Link
+              href="/"
+              className="flex-1 py-4 bg-white border-2 border-border text-foreground rounded-2xl font-black hover:bg-gray-50 transition-colors flex items-center justify-center gap-2"
+            >
               <Trophy className="w-5 h-5" /> 回首頁
             </Link>
           </div>
@@ -210,22 +241,33 @@ export default function ListenQuiz() {
           <span>答對 {correctCount} 題</span>
         </div>
         <div className="h-3 bg-white/20 rounded-full overflow-hidden">
-          <motion.div className="h-full bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full" animate={{ width: ${((currentIdx + 1) / questions.length) * 100}% }} transition={{ duration: 0.5 }} />
+          <motion.div
+            className="h-full bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full"
+            animate={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }}
+            transition={{ duration: 0.5 }}
+          />
         </div>
       </div>
 
-      {/* Speaker card */}
-      <motion.div key={currentIdx} initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white/10 backdrop-blur-md rounded-3xl p-10 flex flex-col items-center gap-6 border border-white/20 w-full max-w-md">
+      {/* Sound button */}
+      <motion.div
+        key={currentIdx}
+        initial={{ scale: 0.8, opacity: 0 }}
+        animate={{ scale: 1, opacity: 1 }}
+        className="bg-white/10 backdrop-blur-md rounded-3xl p-10 flex flex-col items-center gap-6 border border-white/20 w-full max-w-md"
+      >
         <p className="text-white/80 font-bold text-lg">👂 聽聲音，選出正確的單字</p>
-
         <motion.button
           onClick={playCurrentWord}
           whileTap={{ scale: 0.9 }}
-          className={w-32 h-32 rounded-full flex items-center justify-center transition-all shadow-2xl }
+          className={`w-32 h-32 rounded-full flex items-center justify-center transition-all shadow-2xl ${
+            isPlaying
+              ? 'bg-gradient-to-br from-cyan-400 to-blue-500 scale-110 animate-pulse'
+              : 'bg-white/20 hover:bg-white/30 hover:scale-105'
+          }`}
         >
           {isPlaying ? <Volume2 className="w-16 h-16 text-white" /> : <Play className="w-16 h-16 text-white" />}
         </motion.button>
-
         {!hasPlayed && <p className="text-white/60 text-sm animate-bounce">👆 點擊播放聲音</p>}
         {hasPlayed && selected === null && <p className="text-white/60 text-sm">選擇你的答案 ↓</p>}
       </motion.div>
@@ -234,12 +276,15 @@ export default function ListenQuiz() {
       <div className="grid grid-cols-2 gap-3 w-full max-w-md">
         <AnimatePresence>
           {q.options.map((opt, idx) => {
-            const isSelected = selected === idx;
             const isCorrectOpt = idx === q.correctIndex;
             const showResult = selected !== null;
             const bgClass = showResult
-              ? isCorrectOpt ? 'bg-green-500 border-green-300 scale-105' : isSelected ? 'bg-red-500 border-red-300' : 'bg-white/10 border-white/20 opacity-50'
-              : g-gradient-to-br  border-transparent hover:scale-105;
+              ? isCorrectOpt
+                ? 'bg-green-500 border-green-300 scale-105'
+                : selected === idx
+                  ? 'bg-red-500 border-red-300'
+                  : 'bg-white/10 border-white/20 opacity-50'
+              : `bg-gradient-to-br ${ANSWER_COLORS[idx]} border-transparent hover:scale-105`;
 
             return (
               <motion.button
@@ -249,7 +294,7 @@ export default function ListenQuiz() {
                 transition={{ delay: idx * 0.1 }}
                 onClick={() => hasPlayed && handleAnswer(idx)}
                 disabled={selected !== null || !hasPlayed}
-                className={p-5 rounded-2xl border-2 text-white font-black text-lg transition-all shadow-lg disabled:cursor-not-allowed  }
+                className={`p-5 rounded-2xl border-2 text-white font-black transition-all shadow-lg disabled:cursor-not-allowed ${bgClass}`}
               >
                 <div className="text-2xl mb-1">{SLOT_EMOJIS[idx]}</div>
                 <div className="text-lg leading-tight">{opt.english}</div>
@@ -260,8 +305,10 @@ export default function ListenQuiz() {
         </AnimatePresence>
       </div>
 
-      {/* Replay button */}
-      <button onClick={playCurrentWord} className="text-white/60 hover:text-white text-sm font-bold flex items-center gap-2 transition-colors">
+      <button
+        onClick={playCurrentWord}
+        className="text-white/60 hover:text-white text-sm font-bold flex items-center gap-2 transition-colors"
+      >
         <Volume2 className="w-4 h-4" /> 重新播放
       </button>
     </div>
