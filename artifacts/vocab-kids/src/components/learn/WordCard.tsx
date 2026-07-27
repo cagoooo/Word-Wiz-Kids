@@ -13,8 +13,8 @@ interface WordCardProps {
 export function WordCard({ word, isFlipped, onFlip, onSpeak }: WordCardProps) {
   return (
     <div
-      className="relative w-full max-w-[420px] min-w-[280px] sm:min-w-[340px] h-[380px] sm:h-[440px] mx-auto cursor-pointer shrink-0"
-      style={{ perspective: '1200px' }}
+      className="relative mx-auto cursor-pointer shrink-0"
+      style={{ perspective: '1200px', minWidth: '300px', maxWidth: '420px', width: '100%', height: '420px' }}
       data-testid="word-card"
       onClick={onFlip}
     >
