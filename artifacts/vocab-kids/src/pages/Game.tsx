@@ -213,8 +213,9 @@ export default function Game() {
   useEffect(() => {
     if (state.phase === 'question' && state.selectedOptionIndex === null) {
       const q = state.questions[state.currentQuestionIndex];
-      // Only auto-speak when prompt is English (en_to_zh); for zh_to_en the user reads Chinese
+      // Auto-speak: English for en_to_zh, Chinese for zh_to_en
       if (q.direction === 'en_to_zh') speakWord(q.word.english);
+      else speakText(q.word.chinese);
 
       setTimerWidth('100%');
       const transitionTimer = setTimeout(() => {
@@ -560,6 +561,23 @@ export default function Game() {
                 {q.direction === 'en_to_zh' ? q.word.english : q.word.chinese}
               </motion.h2>
             </AnimatePresence>
+
+            {/* 🔊 重播題目發音按鈕 */}
+            <motion.button
+              key={q.word.id + '-speaker'}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={{ opacity: 1, scale: 1 }}
+              onClick={() =>
+                q.direction === 'en_to_zh'
+                  ? speakWord(q.word.english)
+                  : speakText(q.word.chinese)
+              }
+              className="mt-2 sm:mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs sm:text-sm font-bold transition-all hover:scale-105 active:scale-95 border border-primary/20"
+              title="重新播放發音"
+            >
+              <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+              {q.direction === 'en_to_zh' ? '聽英文' : '聽中文'}
+            </motion.button>
 
             <AnimatePresence>
               {state.selectedOptionIndex !== null && state.selectedOptionIndex === q.correctIndex && (
