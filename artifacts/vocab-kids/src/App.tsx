@@ -11,6 +11,8 @@ import Game from '@/pages/Game';
 import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
 
+import { SwUpdateBanner } from '@/components/SwUpdateBanner';
+
 const queryClient = new QueryClient();
 
 function Router() {
@@ -37,6 +39,7 @@ function App() {
           <Router />
         </WouterRouter>
         <Toaster />
+        <SwUpdateBanner />
       </TooltipProvider>
     </QueryClientProvider>
   );

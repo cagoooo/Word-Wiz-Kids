@@ -1,3 +1,7 @@
-<svg width="180" height="180" viewBox="0 0 180 180" fill="none" xmlns="http://www.w3.org/2000/svg">
-<rect width="180" height="180" rx="36" fill="#FF3C00"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <rect width="100" height="100" rx="28" fill="#2e026d"/>
+  <circle cx="50" cy="50" r="38" fill="#ffb703"/>
+  <text x="50" y="66" font-family="'Comic Sans MS', sans-serif" font-weight="900" font-size="48" text-anchor="middle" fill="#2e026d">W</text>
+  <circle cx="78" cy="24" r="8" fill="#ff007f"/>
+  <polygon points="78,14 81,21 88,22 83,27 84,34 78,30 72,34 73,27 68,22 75,21" fill="#ffffff"/>
 </svg>

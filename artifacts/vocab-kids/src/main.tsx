@@ -12,16 +12,38 @@ if ('serviceWorker' in navigator) {
       }
     });
   } else {
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+
     window.addEventListener('load', () => {
       const swUrl = `${import.meta.env.BASE_URL}sw.js`;
-      navigator.serviceWorker.register(swUrl).then(
-        (registration) => {
-          console.log('ServiceWorker registration successful with scope: ', registration.scope);
-        },
-        (err) => {
-          console.log('ServiceWorker registration failed: ', err);
+      navigator.serviceWorker.register(swUrl).then((registration) => {
+        if (registration.waiting) {
+          window.dispatchEvent(
+            new CustomEvent('swUpdateAvailable', { detail: { worker: registration.waiting } })
+          );
         }
-      );
+
+        registration.onupdatefound = () => {
+          const installingWorker = registration.installing;
+          if (installingWorker) {
+            installingWorker.onstatechange = () => {
+              if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                window.dispatchEvent(
+                  new CustomEvent('swUpdateAvailable', { detail: { worker: installingWorker } })
+                );
+              }
+            };
+          }
+        };
+      }).catch((err) => {
+        console.log('ServiceWorker registration failed: ', err);
+      });
     });
   }
 }

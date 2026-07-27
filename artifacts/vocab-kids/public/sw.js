@@ -1,10 +1,20 @@
-const CACHE_NAME = "vocab-kids-cache-v4";
+const CACHE_NAME = "vocab-kids-cache-v5";
 const ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest",
-  "./icon.png"
+  "./manifest.webmanifest?v=5",
+  "./icon.png?v=5",
+  "./favicon.png?v=5",
+  "./favicon.svg?v=5",
+  "./og-image.png?v=5"
 ];
+
+// Force SW skipWaiting on explicit message
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
+});
 
 self.addEventListener("install", (event) => {
   self.skipWaiting();
@@ -55,7 +65,7 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Cache-first for assets
+  // Cache-first for static assets
   event.respondWith(
     caches.match(event.request).then((cachedResponse) => {
       return cachedResponse || fetch(event.request).then(response => {
