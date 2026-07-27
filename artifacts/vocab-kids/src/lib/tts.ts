@@ -72,3 +72,8 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
 export function speakSlow(text: string): Promise<void> {
   return speak(text, { rate: 0.65 });
 }
+
+// Backward compatibility exports
+export const speakWord = (text: string): Promise<void> => speak(text);
+export const isTTSSupported = (): boolean => typeof window !== 'undefined' && 'speechSynthesis' in window;
+
