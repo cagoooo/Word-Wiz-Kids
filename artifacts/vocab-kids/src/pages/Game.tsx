@@ -15,6 +15,9 @@ import {
   sfxCountdownTick, sfxCountdownGo, sfxLevelComplete,
 } from '@/lib/soundEngine';
 import { useSoundSettings } from '@/hooks/useSoundSettings';
+import { UserExpBar } from '@/components/gamification/UserExpBar';
+import { AudioButton } from '@/components/ui/AudioButton';
+import { addExp, getUserStats, saveUserStats } from '@/lib/gamification';
 
 type GamePhase = 'select' | 'countdown' | 'question' | 'results';
 
@@ -282,6 +285,8 @@ export default function Game() {
       animate={{ opacity: 1, scale: 1 }}
       className="relative z-10 w-full max-w-4xl bg-card/95 backdrop-blur-md rounded-[2rem] sm:rounded-[3rem] border-4 border-white/40 shadow-2xl p-5 sm:p-8 md:p-14 text-center mt-4 sm:mt-8 mx-3 sm:mx-4"
     >
+      <UserExpBar />
+
       {/* 返回按鈕 */}
       <Link href="/" className="absolute top-4 left-4 sm:top-6 sm:left-6 text-muted-foreground hover:text-foreground transition-colors bg-muted p-3 sm:p-4 rounded-full shadow-sm hover:scale-105 active:scale-95">
         <ArrowLeft className="w-6 h-6 sm:w-8 sm:h-8" />

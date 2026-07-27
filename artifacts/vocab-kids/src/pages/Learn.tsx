@@ -9,6 +9,9 @@ import { WordCard } from '@/components/learn/WordCard';
 import { Button } from '@/components/ui/button';
 import { PhoneticHighlight } from '@/components/learn/PhoneticHighlight';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
+import { UserExpBar } from '@/components/gamification/UserExpBar';
+import { AudioButton } from '@/components/ui/AudioButton';
+import { addExp } from '@/lib/gamification';
 
 export default function Learn() {
   const { words: allWords, categories, loading, error: wordError } = useWordLibrary();
@@ -337,9 +340,13 @@ export default function Learn() {
   };
 
   return (
-    <div className="min-h-[100dvh] pt-24 pb-20 px-4 flex flex-col max-w-5xl mx-auto bg-background">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-6">
+    <div className="min-h-[100dvh] pt-24 pb-16 px-4 bg-background flex flex-col items-center">
+      <div className="w-full max-w-2xl">
+        <UserExpBar />
+      </div>
+
+      {/* Main Header & Mode Selector */}
+      <div className="w-full max-w-2xl flex flex-col md:flex-row items-center justify-between gap-6 mb-8">
         <div className="text-center md:text-left">
           <h1 className="text-4xl font-black text-primary tracking-wider mb-2">單字學習</h1>
           <p className="text-muted-foreground font-medium tracking-wide">

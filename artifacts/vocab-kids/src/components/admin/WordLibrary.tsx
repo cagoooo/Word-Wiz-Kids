@@ -5,10 +5,12 @@
  */
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Trash2, Edit3, Save, X, Plus, BookOpen, AlertCircle, RefreshCw } from 'lucide-react';
+import { Search, Trash2, Edit3, Save, X, Plus, BookOpen, AlertCircle, RefreshCw, Upload, Download, FileSpreadsheet } from 'lucide-react';
 import { getAllWords, updateWord, deleteWord, addWord, type FirestoreWord } from '@/lib/firestoreWords';
 import { isFirebaseConfigured } from '@/lib/firebase';
 import { MOCK_WORDS } from '@/data/words';
+import { AudioButton } from '@/components/ui/AudioButton';
+import { parseCSV, exportToCSV, downloadSampleCSV } from '@/lib/csvHelper';
 
 const CATEGORIES = ['全部', '動物', '水果', '顏色', '數字', '食物', '交通', '家庭', '身體', '學校', '其他'];
 
@@ -100,8 +102,44 @@ export function WordLibrary() {
     }
   }
 
+  const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const text = await file.text();
+    const parsed = parseCSV(text);
+    if (parsed.length === 0) {
+      alert('未偵測到有效的單字資料。請檢查 CSV 檔案格式。');
+      return;
+    }
+
+    if (!confirm(`成功解析 ${parsed.length} 個單字，確定要匯入單字庫嗎？`)) return;
+
+    setSaving(true);
+    try {
+      if (isFirebaseConfigured) {
+        for (const w of parsed) {
+          await addWord({ english: w.english, chinese: w.chinese, phonetic: w.phonetic || '', category: w.category || '其他' });
+        }
+        await load();
+      }
+      alert(`已成功將 ${parsed.length} 個單字寫入單字庫！`);
+    } catch (err) {
+      alert('匯入失敗：' + (err instanceof Error ? err.message : '未知錯誤'));
+    } finally {
+      setSaving(false);
+      e.target.value = '';
+    }
+  };
+
   return (
     <div className="space-y-5">
+      {error && (
+        <div className="flex items-center gap-2 p-3 bg-destructive/10 border border-destructive/30 rounded-xl text-destructive text-sm">
+          <AlertCircle className="w-4 h-4" />
+          {error}
+        </div>
+      )}
+
       {/* Offline notice */}
       {!isFirebaseConfigured && (
         <div className="flex items-start gap-3 p-4 bg-amber-50 border border-amber-200 rounded-2xl text-amber-800 text-sm">
@@ -123,7 +161,31 @@ export function WordLibrary() {
             data-testid="word-search"
           />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          <label className="flex items-center gap-1.5 px-3 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-2xl font-bold text-xs cursor-pointer transition-colors shrink-0">
+            <Upload className="w-4 h-4" />
+            匯入 CSV
+            <input type="file" accept=".csv" onChange={handleCSVUpload} className="hidden" />
+          </label>
+
+          <button
+            onClick={() => exportToCSV(displayWords, 'WordWizKids_單字庫備份.csv')}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl font-bold text-xs transition-colors shrink-0"
+            title="導出目前單字庫為 CSV 檔"
+          >
+            <Download className="w-4 h-4" />
+            導出 CSV
+          </button>
+
+          <button
+            onClick={downloadSampleCSV}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-2xl font-bold text-xs transition-colors shrink-0"
+            title="下載標準 CSV 匯入範本"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            下載範本
+          </button>
+
           <button
             onClick={load}
             className="p-3 bg-muted hover:bg-muted/70 rounded-2xl transition-colors"
@@ -132,6 +194,7 @@ export function WordLibrary() {
           >
             <RefreshCw className="w-4 h-4" />
           </button>
+
           {isFirebaseConfigured && (
             <button
               onClick={() => setShowAddForm(true)}
@@ -274,7 +337,10 @@ export function WordLibrary() {
                     </>
                   ) : (
                     <>
-                      <span className="font-bold text-sm">{w.english}</span>
+                      <div className="flex items-center gap-1.5 font-bold text-sm">
+                        <span>{w.english}</span>
+                        <AudioButton text={w.english} size="sm" showSlow={false} />
+                      </div>
                       <span className="text-sm text-muted-foreground">{w.chinese}</span>
                       <span className="text-xs bg-muted px-2 py-0.5 rounded-full w-fit">{w.category}</span>
                       <div className="flex justify-end gap-1">

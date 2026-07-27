@@ -2,10 +2,16 @@ import { HeroScene } from '@/components/hero/HeroScene';
 import { motion } from 'framer-motion';
 import { Sparkles, ArrowRight, Star, BookOpen, Gamepad2, Trophy } from 'lucide-react';
 import { Link } from 'wouter';
+import { UserExpBar } from '@/components/gamification/UserExpBar';
 
 export default function Home() {
   return (
-    <div className="min-h-[100dvh] flex flex-col pt-16">
+    <div className="min-h-[100dvh] flex flex-col pt-20">
+      {/* Exp Bar */}
+      <div className="w-full max-w-4xl mx-auto px-4 z-20">
+        <UserExpBar />
+      </div>
+
       {/* Hero Section */}
       <section className="relative h-[80vh] w-full flex items-center justify-center overflow-hidden">
         <HeroScene />
