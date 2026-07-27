@@ -5,6 +5,7 @@
  */
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
+import { getDatabase, type Database } from 'firebase/database';
 
 const requiredKeys = [
   'VITE_FIREBASE_API_KEY',
@@ -26,6 +27,7 @@ export const isFirebaseConfigured: boolean = checkConfigured();
 
 let _app: FirebaseApp | null = null;
 let _db: Firestore | null = null;
+let _rtdb: Database | null = null;
 
 if (isFirebaseConfigured) {
   const firebaseConfig = {
@@ -40,7 +42,9 @@ if (isFirebaseConfigured) {
 
   _app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   _db = getFirestore(_app);
+  _rtdb = getDatabase(_app);
 }
 
 export const db: Firestore | null = _db;
+export const rtdb: Database | null = _rtdb;
 
