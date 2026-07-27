@@ -22,21 +22,54 @@ export const SwUpdateBanner: React.FC = () => {
   }, []);
 
   const handleReload = async () => {
-    try {
-      if (waitingWorker) {
-        waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    setShow(false);
+
+    let reloadTriggered = false;
+    const onControllerChange = () => {
+      if (!reloadTriggered) {
+        reloadTriggered = true;
+        window.location.reload();
       }
-      // Proactively clear Cache Storage to guarantee immediate update
-      if ('caches' in window) {
+    };
+
+    // 1. Listen for SW controller takeover
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    }
+
+    // 2. Clear all cache storage entries
+    if ('caches' in window) {
+      try {
         const keys = await caches.keys();
         await Promise.all(keys.map((key) => caches.delete(key)));
+      } catch (err) {
+        console.warn('Error clearing caches on SW update:', err);
       }
-    } catch (err) {
-      console.error('Error clearing caches on SW update:', err);
-    } finally {
-      setShow(false);
-      window.location.reload();
     }
+
+    // 3. Post SKIP_WAITING to waiting worker
+    if (waitingWorker) {
+      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+    }
+
+    // 4. Safety fallback timeout: if controllerchange doesn't fire in 500ms, unregister SW & force reload
+    setTimeout(() => {
+      if (!reloadTriggered) {
+        reloadTriggered = true;
+        if ('serviceWorker' in navigator) {
+          navigator.serviceWorker.getRegistrations().then((registrations) => {
+            for (const reg of registrations) {
+              reg.unregister();
+            }
+            window.location.reload();
+          }).catch(() => {
+            window.location.reload();
+          });
+        } else {
+          window.location.reload();
+        }
+      }
+    }, 500);
   };
 
   if (!show) return null;
