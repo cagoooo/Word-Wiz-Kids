@@ -448,7 +448,7 @@ export default function Game() {
     if (!q) return null;
 
     return (
-      <div className="relative z-10 w-full max-w-6xl flex flex-col h-[100dvh] pt-3 pb-3 px-3 sm:pt-5 sm:pb-5 sm:px-4 md:px-8">
+      <div className="relative z-10 w-full max-w-6xl flex flex-col min-h-[100dvh] pt-3 pb-4 px-3 sm:pt-4 sm:pb-5 sm:px-4 md:px-8">
         {/* Top Bar */}
         <div className="flex justify-between items-center mb-3 sm:mb-5 bg-card/95 backdrop-blur-md rounded-full p-2 pl-4 sm:pl-8 pr-2 sm:pr-4 shadow-lg border-2 sm:border-4 border-white/20">
           <div className="text-sm sm:text-2xl font-black text-muted-foreground tracking-wider whitespace-nowrap">
@@ -485,13 +485,13 @@ export default function Game() {
         </div>
 
         {/* Word Display */}
-        <div className="flex-1 flex flex-col items-center justify-center mb-6 relative">
+        <div className="flex flex-col items-center justify-center mb-3 sm:mb-4 relative">
           {/* Direction badge */}
           <div className={`mb-2 sm:mb-3 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-black tracking-widest shadow-sm border-2 ${q.direction === 'en_to_zh' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
             {q.direction === 'en_to_zh' ? '看英文，選中文' : '看中文，選英文'}
           </div>
 
-          <div className="text-center bg-card rounded-[1.5rem] sm:rounded-[3rem] shadow-2xl border-4 sm:border-8 border-white w-full py-5 sm:py-14 md:py-24 relative overflow-hidden flex flex-col items-center justify-center min-h-[100px] sm:min-h-[180px]">
+          <div className="text-center bg-card rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl border-4 sm:border-8 border-white w-full py-4 sm:py-8 md:py-14 relative overflow-hidden flex flex-col items-center justify-center min-h-[90px] sm:min-h-[140px] md:min-h-[180px]">
             <AnimatePresence mode="wait">
               <motion.h2
                 key={q.word.id + q.direction}
@@ -499,7 +499,7 @@ export default function Game() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 className="font-black text-foreground drop-shadow-sm px-3 break-words w-full"
-                style={{ fontSize: 'clamp(1.8rem, 13vw, 9rem)', letterSpacing: '0.02em' }}
+                style={{ fontSize: 'clamp(1.5rem, 10vw, 7rem)', letterSpacing: '0.02em' }}
               >
                 {q.direction === 'en_to_zh' ? q.word.english : q.word.chinese}
               </motion.h2>
@@ -533,7 +533,7 @@ export default function Game() {
         </div>
 
         {/* Answers Grid */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-5 w-full shrink-0">
+        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-5 w-full shrink-0 mt-auto">
           {q.options.map((opt, i) => {
             const isSelected = state.selectedOptionIndex === i;
             const isCorrectAnswer = i === q.correctIndex;
@@ -673,9 +673,11 @@ export default function Game() {
 
   return (
     <div className={`min-h-[100dvh] flex flex-col items-center relative bg-background ${
-      state.phase === 'question' || state.phase === 'countdown'
+      state.phase === 'countdown'
         ? 'justify-center overflow-hidden'
-        : 'justify-start md:justify-center overflow-y-auto py-4 sm:py-6 md:py-0'
+        : state.phase === 'question'
+          ? 'justify-start overflow-y-auto'
+          : 'justify-start md:justify-center overflow-y-auto py-4 sm:py-6 md:py-0'
     }`}>
       <style>{`
         @keyframes bg-pan {

@@ -42,10 +42,12 @@ export function AnswerButton({
       data-testid={testId}
       className={[
         'relative flex flex-col md:flex-row items-center justify-center md:justify-start',
-        'gap-1 sm:gap-2 md:gap-6',
-        'p-3 sm:p-4 md:p-8',
+        'gap-1 md:gap-6',
+        /* ↓ 縮小手機/iPad 的 padding，保留桌機的大版型 */
+        'p-2 sm:p-3 md:p-8',
         'rounded-2xl sm:rounded-3xl w-full h-full',
-        'min-h-[72px] sm:min-h-[100px] md:min-h-[120px]',
+        /* ↓ 手機60px / iPad 80px / 桌機120px */
+        'min-h-[60px] sm:min-h-[80px] md:min-h-[120px]',
         'shadow-[0_6px_0_rgba(0,0,0,0.2)] transition-all duration-200',
         config.bg, config.text, stateClasses,
         disabled
@@ -53,12 +55,14 @@ export function AnswerButton({
           : 'hover:shadow-[0_8px_0_rgba(0,0,0,0.2)] hover:-translate-y-0.5 active:translate-y-2 active:shadow-none',
       ].join(' ')}
     >
-      <div className="shrink-0 mb-0.5 sm:mb-1 md:mb-0">
-        <Icon className="w-6 h-6 sm:w-9 sm:h-9 md:w-14 md:h-14 fill-current opacity-90 drop-shadow-sm" />
+      <div className="shrink-0">
+        {/* ↓ 手機小圖示，桌機大圖示 */}
+        <Icon className="w-4 h-4 sm:w-6 sm:h-6 md:w-14 md:h-14 fill-current opacity-90 drop-shadow-sm" />
       </div>
-      <span className="text-base sm:text-xl md:text-4xl font-black tracking-wide text-center md:text-left drop-shadow-md leading-tight break-words max-w-full">
+      <span className="text-sm sm:text-base md:text-4xl font-black tracking-wide text-center md:text-left drop-shadow-md leading-tight break-words max-w-full">
         {label}
       </span>
     </motion.button>
   );
 }
+
