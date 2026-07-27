@@ -439,9 +439,46 @@ function SettingsTab() {
         </button>
       </div>
 
-      <p className="text-xs text-muted-foreground text-center">
+      <p className="text-xs text-muted-foreground text-center mb-8">
         設定新的 4 位數 PIN 碼，儲存後立即生效
       </p>
+
+      {/* Gemini API Key Configuration */}
+      <div className="pt-6 border-t border-border space-y-4">
+        <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+          <Sparkles className="w-5 h-5 text-purple-500" />
+          Gemini 2.5 Flash Lite 金鑰設定
+        </h3>
+        <p className="text-xs text-muted-foreground">
+          提供英文單字圖片 AI 辨識功能。已支援 <code className="bg-purple-100 text-purple-800 px-1 rounded">gemini-2.5-flash-lite</code> 視覺辨識模型。
+        </p>
+        <div className="flex gap-2">
+          <input
+            type="password"
+            placeholder="貼上您的 Gemini API Key (AIzaSy...)"
+            defaultValue={localStorage.getItem('vocab-gemini-key') || ''}
+            id="gemini-key-input"
+            className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              const val = (document.getElementById('gemini-key-input') as HTMLInputElement)?.value.trim();
+              if (val) {
+                localStorage.setItem('vocab-gemini-key', val);
+                alert('Gemini API Key 已儲存！');
+              } else {
+                localStorage.removeItem('vocab-gemini-key');
+                alert('已清除自訂 Gemini API Key！');
+              }
+            }}
+            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors shrink-0 flex items-center gap-1.5"
+          >
+            <Save className="w-4 h-4" />
+            儲存金鑰
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
