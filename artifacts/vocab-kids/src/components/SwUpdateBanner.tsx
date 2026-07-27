@@ -21,11 +21,22 @@ export const SwUpdateBanner: React.FC = () => {
     };
   }, []);
 
-  const handleReload = () => {
-    if (waitingWorker) {
-      waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+  const handleReload = async () => {
+    try {
+      if (waitingWorker) {
+        waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      }
+      // Proactively clear Cache Storage to guarantee immediate update
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((key) => caches.delete(key)));
+      }
+    } catch (err) {
+      console.error('Error clearing caches on SW update:', err);
+    } finally {
+      setShow(false);
+      window.location.reload();
     }
-    setShow(false);
   };
 
   if (!show) return null;
