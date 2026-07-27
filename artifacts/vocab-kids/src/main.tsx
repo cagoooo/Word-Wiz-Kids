@@ -20,6 +20,16 @@ if ('serviceWorker' in navigator) {
       }
     });
 
+    // Self-healing: unregister any legacy root-scoped ServiceWorker pointing to domain root
+    navigator.serviceWorker.getRegistrations().then((registrations) => {
+      for (const reg of registrations) {
+        if (reg.scope === `${window.location.origin}/` || reg.scope === 'https://cagoooo.github.io/') {
+          console.warn('Unregistering legacy root-scoped ServiceWorker:', reg.scope);
+          reg.unregister();
+        }
+      }
+    });
+
     window.addEventListener('load', () => {
       const swUrl = `${import.meta.env.BASE_URL}sw.js`;
       navigator.serviceWorker.register(swUrl).then((registration) => {
