@@ -51,6 +51,8 @@ if ('serviceWorker' in navigator) {
             };
           }
         };
+        // Actively check for SW updates on load
+        registration.update().catch(() => {});
       }).catch((err) => {
         console.log('ServiceWorker registration failed: ', err);
       });

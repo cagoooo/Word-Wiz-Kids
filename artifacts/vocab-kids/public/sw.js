@@ -1,15 +1,15 @@
-const CACHE_NAME = "vocab-kids-cache-v7";
+const CACHE_NAME = "vocab-kids-cache-v8";
 const ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest?v=5",
-  "./icon.png?v=5",
-  "./favicon.png?v=5",
-  "./favicon.svg?v=5",
-  "./og-image.png?v=5"
+  "./manifest.webmanifest?v=8",
+  "./icon.png?v=8",
+  "./favicon.png?v=8",
+  "./favicon.svg?v=8",
+  "./og-image.png?v=8"
 ];
 
-// Force SW skipWaiting on explicit message
+// Force SW skipWaiting on explicit user click message only
 self.addEventListener("message", (event) => {
   if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
@@ -17,7 +17,6 @@ self.addEventListener("message", (event) => {
 });
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS).catch((err) => {
