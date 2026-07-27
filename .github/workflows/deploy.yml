@@ -31,7 +31,7 @@ jobs:
         run: pnpm install --no-frozen-lockfile
 
       - name: Build project 🏗️
-        run: pnpm run build
+        run: pnpm --filter ./artifacts/vocab-kids build
 
       - name: Deploy to GitHub Pages 🚀
         uses: peaceiris/actions-gh-pages@v4
