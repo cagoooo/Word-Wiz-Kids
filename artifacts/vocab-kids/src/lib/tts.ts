@@ -34,7 +34,7 @@ if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
 export interface SpeakOptions {
   rate?: number; // 1.0 normal, 0.7 slow
   pitch?: number; // 1.0 default
-  lang?: 'en-US' | 'en-GB';
+  lang?: string; // 'en-US' | 'zh-TW' | string
 }
 
 export async function speak(text: string, options: SpeakOptions = {}): Promise<void> {
@@ -50,17 +50,27 @@ export async function speak(text: string, options: SpeakOptions = {}): Promise<v
     await loadVoices();
   }
 
-  const { rate = 1.0, pitch = 1.0, lang = 'en-US' } = options;
+  // Detect language if not explicitly provided
+  const isChinese = /[\u4e00-\u9fa5]/.test(text);
+  const targetLang = options.lang || (isChinese ? 'zh-TW' : 'en-US');
+  const { rate = 1.0, pitch = 1.0 } = options;
 
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.rate = rate;
   utterance.pitch = pitch;
-  utterance.lang = lang;
+  utterance.lang = targetLang;
 
-  // Try to find a high quality English voice
-  const preferredVoice = voices.find(
-    (v) => v.lang.startsWith(lang) && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Karen'))
-  ) || voices.find((v) => v.lang.startsWith(lang)) || voices.find((v) => v.lang.startsWith('en'));
+  let preferredVoice: SpeechSynthesisVoice | undefined;
+
+  if (isChinese || targetLang.startsWith('zh')) {
+    preferredVoice = voices.find(
+      (v) => v.lang.startsWith('zh') && (v.name.includes('Google') || v.name.includes('HsiaoChen') || v.name.includes('Mei-Jia') || v.name.includes('HanHan') || v.name.includes('Natural'))
+    ) || voices.find((v) => v.lang.startsWith('zh'));
+  } else {
+    preferredVoice = voices.find(
+      (v) => v.lang.startsWith(targetLang) && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Samantha') || v.name.includes('Karen'))
+    ) || voices.find((v) => v.lang.startsWith('en'));
+  }
 
   if (preferredVoice) {
     utterance.voice = preferredVoice;
@@ -73,7 +83,8 @@ export function speakSlow(text: string): Promise<void> {
   return speak(text, { rate: 0.65 });
 }
 
-// Backward compatibility exports
-export const speakWord = (text: string): Promise<void> => speak(text);
+// Backward compatibility & convenience exports
+export const speakWord = (text: string, lang?: string): Promise<void> => speak(text, { lang });
+export const speakText = (text: string, lang?: string): Promise<void> => speak(text, { lang });
 export const isTTSSupported = (): boolean => typeof window !== 'undefined' && 'speechSynthesis' in window;
 

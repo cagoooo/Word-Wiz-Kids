@@ -4,10 +4,11 @@
  */
 import { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Camera, Upload, Loader2, Check, Plus, ArrowLeft, X, BookOpen, Sparkles } from 'lucide-react';
-import { Link } from 'wouter';
+import { Camera, Upload, Loader2, Check, Plus, ArrowLeft, X, BookOpen, Sparkles, Key, Settings, Save } from 'lucide-react';
+import { Link, useLocation } from 'wouter';
 import { UserExpBar } from '@/components/gamification/UserExpBar';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
+import { getGeminiApiKey } from '@/lib/geminiClient';
 
 interface DetectedWord {
   english: string;
@@ -17,9 +18,12 @@ interface DetectedWord {
   category: string;
 }
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || '';
-
 async function detectWordsFromImage(base64Image: string, mimeType: string): Promise<DetectedWord[]> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    throw new Error('API_KEY_MISSING: 未設定 Gemini API Key。請先點擊下方按鈕設定金鑰。');
+  }
+
   const prompt = 分析這張圖片，找出所有英文單字。
 對於每個找到的英文單字，回傳以下 JSON 陣列格式（只回傳 JSON，不要其他文字）：
 [
@@ -42,7 +46,13 @@ async function detectWordsFromImage(base64Image: string, mimeType: string): Prom
       })
     }
   );
-  if (!response.ok) throw new Error('Gemini API error');
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    const msg = errData.error?.message || Gemini API 請求失敗 ();
+    throw new Error(API_KEY_ERROR: );
+  }
+
   const data = await response.json();
   const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '[]';
   const jsonMatch = text.match(/\[[\s\S]*\]/);
@@ -53,6 +63,7 @@ async function detectWordsFromImage(base64Image: string, mimeType: string): Prom
 export default function PhotoScan() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const [, setLocation] = useLocation();
   const { addWord } = useWordLibrary() as unknown as { addWord?: (w: object) => Promise<void> };
 
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -60,10 +71,32 @@ export default function PhotoScan() {
   const [detectedWords, setDetectedWords] = useState<DetectedWord[]>([]);
   const [addedIds, setAddedIds] = useState<Set<number>>(new Set());
   const [error, setError] = useState<string | null>(null);
+  const [isApiKeyError, setIsApiKeyError] = useState(false);
   const [addingIdx, setAddingIdx] = useState<number | null>(null);
+  
+  // API Key Quick Settings Modal
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [inputKey, setInputKey] = useState(getGeminiApiKey());
+  const [keySavedMsg, setKeySavedMsg] = useState('');
+
+  const currentFileRef = useRef<File | null>(null);
 
   const handleFile = async (file: File) => {
-    setError(null); setDetectedWords([]); setAddedIds(new Set());
+    currentFileRef.current = file;
+    setError(null);
+    setIsApiKeyError(false);
+    setDetectedWords([]);
+    setAddedIds(new Set());
+
+    // Check Key first
+    const currentKey = getGeminiApiKey();
+    if (!currentKey) {
+      setIsApiKeyError(true);
+      setError('未偵測到 Gemini API 金鑰。請點擊「設定 API 金鑰」按鈕即可填入並啟用！');
+      setShowKeyModal(true);
+      return;
+    }
+
     setPreviewUrl(URL.createObjectURL(file));
     setIsScanning(true);
     try {
@@ -76,8 +109,36 @@ export default function PhotoScan() {
       const words = await detectWordsFromImage(base64, file.type || 'image/jpeg');
       if (words.length === 0) setError('圖片中找不到英文單字，請試試清晰的教科書頁面');
       else setDetectedWords(words);
-    } catch { setError('掃描失敗，請確認網路連線後重試'); }
-    finally { setIsScanning(false); }
+    } catch (err: any) {
+      const errMsg = err?.message || '掃描失敗';
+      if (errMsg.includes('API_KEY')) {
+        setIsApiKeyError(true);
+        setError('Gemini API 金鑰尚未設定或已失效，請點擊下方按鈕進行設定');
+      } else {
+        setError(errMsg);
+      }
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleSaveKey = () => {
+    const trimmed = inputKey.trim();
+    if (trimmed) {
+      localStorage.setItem('vocab-gemini-key', trimmed);
+      setKeySavedMsg('✅ API 金鑰已儲存！');
+    } else {
+      localStorage.removeItem('vocab-gemini-key');
+      setKeySavedMsg('已清除自訂 API Key');
+    }
+    setTimeout(() => {
+      setKeySavedMsg('');
+      setShowKeyModal(false);
+      // Auto retry if a file was pending
+      if (currentFileRef.current) {
+        handleFile(currentFileRef.current);
+      }
+    }, 600);
   };
 
   const handleAddWord = async (word: DetectedWord, idx: number) => {
@@ -97,23 +158,50 @@ export default function PhotoScan() {
     }
   };
 
-  const resetScan = () => { setPreviewUrl(null); setDetectedWords([]); setAddedIds(new Set()); setError(null); };
+  const resetScan = () => { setPreviewUrl(null); setDetectedWords([]); setAddedIds(new Set()); setError(null); setIsApiKeyError(false); };
 
   return (
     <div className="min-h-[100dvh] bg-gradient-to-br from-violet-50 via-blue-50 to-cyan-50 py-4 px-4">
       <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/" className="p-2 rounded-full bg-white shadow hover:scale-105 transition-transform text-muted-foreground">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
-              <Camera className="w-6 h-6 text-violet-500" /> AI 拍照識單字
-            </h1>
-            <p className="text-sm text-muted-foreground">拍下教科書，AI 自動辨識英文單字</p>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <Link href="/" className="p-2 rounded-full bg-white shadow hover:scale-105 transition-transform text-muted-foreground">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
+                <Camera className="w-6 h-6 text-violet-500" /> AI 拍照識單字
+              </h1>
+              <p className="text-sm text-muted-foreground">拍下教科書，AI 自動辨識英文單字</p>
+            </div>
           </div>
+
+          <button
+            onClick={() => setShowKeyModal(true)}
+            className="flex items-center gap-1.5 bg-white border border-violet-200 text-violet-700 px-3 py-1.5 rounded-full text-xs font-bold shadow-sm hover:bg-violet-50 transition-colors"
+          >
+            <Key className="w-3.5 h-3.5" /> Key 設定
+          </button>
         </div>
+
         <UserExpBar />
+
+        {/* Key Warning banner if missing */}
+        {!getGeminiApiKey() && (
+          <div className="mt-4 bg-amber-50 border-2 border-amber-200 rounded-2xl p-4 flex items-center justify-between gap-3 text-amber-800 text-sm font-bold">
+            <div className="flex items-center gap-2">
+              <Key className="w-5 h-5 text-amber-600 shrink-0" />
+              <span>尚未設定 Gemini API Key，點擊設定即可啟用拍照識字！</span>
+            </div>
+            <button
+              onClick={() => setShowKeyModal(true)}
+              className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1.5 rounded-xl text-xs font-black shrink-0 transition-colors"
+            >
+              快速設定
+            </button>
+          </div>
+        )}
 
         {!previewUrl && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="mt-6 space-y-4">
@@ -150,8 +238,26 @@ export default function PhotoScan() {
             </div>
 
             {error && (
-              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 font-bold text-sm">
-                ⚠️ {error} <button onClick={resetScan} className="ml-3 underline text-red-500 text-xs">重新掃描</button>
+              <div className="bg-red-50 border-2 border-red-200 rounded-2xl p-5 text-red-700 font-bold text-sm space-y-3">
+                <p>⚠️ {error}</p>
+                {isApiKeyError ? (
+                  <div className="flex flex-wrap gap-2 pt-1">
+                    <button
+                      onClick={() => setShowKeyModal(true)}
+                      className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    >
+                      <Key className="w-3.5 h-3.5" /> ⚡ 快速設定 API 金鑰
+                    </button>
+                    <button
+                      onClick={() => setLocation('/admin')}
+                      className="bg-white border border-red-300 text-red-700 hover:bg-red-50 px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-colors"
+                    >
+                      <Settings className="w-3.5 h-3.5" /> ⚙️ 前往管理員設定頁
+                    </button>
+                  </div>
+                ) : (
+                  <button onClick={resetScan} className="underline text-red-500 text-xs">重新掃描</button>
+                )}
               </div>
             )}
 
@@ -174,8 +280,8 @@ export default function PhotoScan() {
                           <p className="text-sm text-muted-foreground">{word.chinese}</p>
                           {word.example && <p className="text-xs text-slate-400 italic truncate">{word.example}</p>}
                         </div>
-                        <button onClick={() => handleAddWord(word, idx)} disabled={addedIds.has(idx) || addingIdx === idx} className={shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all }>
-                          {addingIdx === idx ? <Loader2 className="w-4 h-4 animate-spin" /> : addedIds.has(idx) ? <Check className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                        <button onClick={() => handleAddWord(word, idx)} disabled={addedIds.has(idx) || addingIdx === idx} className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all bg-violet-500 text-white hover:bg-violet-600 disabled:opacity-50">
+                          {addingIdx === idx ? <Loader2 className="w-4 h-4 animate-spin" /> : addedIds.has(idx) ? <Check className="w-4 h-4 text-green-300" /> : <Plus className="w-4 h-4" />}
                         </button>
                       </motion.div>
                     ))}
@@ -191,6 +297,52 @@ export default function PhotoScan() {
               )}
             </AnimatePresence>
           </motion.div>
+        )}
+
+        {/* Quick API Key Settings Modal */}
+        {showKeyModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white rounded-3xl p-6 max-w-md w-full shadow-2xl border-4 border-violet-200 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-black text-foreground flex items-center gap-2">
+                  <Key className="w-5 h-5 text-violet-600" /> Gemini API 金鑰設定
+                </h3>
+                <button onClick={() => setShowKeyModal(false)} className="p-1 rounded-full text-slate-400 hover:text-slate-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                拍照辨識功能需要 Google Gemini API Key（支援 <code className="bg-violet-100 text-violet-800 px-1 rounded">gemini-2.5-flash-lite</code>）。請在下方貼上金鑰後儲存：
+              </p>
+
+              <div className="space-y-2">
+                <input
+                  type="password"
+                  placeholder="貼上 Gemini API Key (AIzaSy...)"
+                  value={inputKey}
+                  onChange={e => setInputKey(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl border-2 border-violet-200 bg-slate-50 text-sm font-mono focus:outline-none focus:border-violet-500"
+                />
+                {keySavedMsg && <p className="text-xs font-bold text-green-600 text-center">{keySavedMsg}</p>}
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  onClick={handleSaveKey}
+                  className="flex-1 py-3 bg-violet-600 hover:bg-violet-700 text-white rounded-2xl font-black text-sm shadow-md transition-all flex items-center justify-center gap-1.5"
+                >
+                  <Save className="w-4 h-4" /> 儲存金鑰並啟用
+                </button>
+                <button
+                  onClick={() => { setShowKeyModal(false); setLocation('/admin'); }}
+                  className="px-4 py-3 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-2xl font-bold text-xs transition-colors flex items-center gap-1"
+                >
+                  <Settings className="w-4 h-4" /> 至管理後台
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </div>
     </div>

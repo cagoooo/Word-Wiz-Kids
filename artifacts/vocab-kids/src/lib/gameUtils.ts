@@ -11,10 +11,26 @@ export interface Question {
   direction: QuestionDirection;
 }
 
-export function generateQuestions(words: Word[], count: number): Question[] {
-  // Pick count random words
-  const shuffledWords = [...words].sort(() => Math.random() - 0.5);
-  const selectedWords = shuffledWords.slice(0, Math.min(count, words.length));
+export type QuestionOrderMode = 'random' | 'newest' | 'oldest';
+
+export function generateQuestions(
+  words: Word[],
+  count: number,
+  orderMode: QuestionOrderMode = 'random'
+): Question[] {
+  let selectedWords: Word[] = [];
+
+  if (orderMode === 'newest') {
+    // Newest first (reverse array order, or latest added)
+    selectedWords = [...words].reverse().slice(0, Math.min(count, words.length));
+  } else if (orderMode === 'oldest') {
+    // Oldest first (original array order)
+    selectedWords = [...words].slice(0, Math.min(count, words.length));
+  } else {
+    // Random shuffle
+    const shuffledWords = [...words].sort(() => Math.random() - 0.5);
+    selectedWords = shuffledWords.slice(0, Math.min(count, words.length));
+  }
 
   return selectedWords.map((correctWord) => {
     // Pick distractors

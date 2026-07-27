@@ -2,11 +2,11 @@ import { useReducer, useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Star, Play, ArrowLeft, Trophy, Loader2, Volume2, VolumeX, WifiOff, RefreshCw } from 'lucide-react';
 import { Link } from 'wouter';
-import { speakWord } from '@/lib/tts';
+import { speakWord, speakText } from '@/lib/tts';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
 import { Confetti } from '@/components/game/Confetti';
 import { AnswerButton } from '@/components/game/AnswerButton';
-import { generateQuestions, calcScore, getStarRating, Question } from '@/lib/gameUtils';
+import { generateQuestions, calcScore, getStarRating, Question, QuestionOrderMode } from '@/lib/gameUtils';
 import { submitScore } from '@/lib/firestore';
 import { loadStudent, getOrCreateStudentId } from '@/hooks/useStudent';
 import {
@@ -21,11 +21,12 @@ import { addExp, getUserStats, saveUserStats } from '@/lib/gamification';
 import { recordMistake } from '@/lib/mistakes';
 
 type GamePhase = 'select' | 'countdown' | 'question' | 'results';
+type DifficultyType = 'easy' | 'normal' | 'hard' | 'super' | 'all';
 
 interface GameState {
   phase: GamePhase;
   category: string;
-  difficulty: 'easy' | 'normal' | 'hard';
+  difficulty: DifficultyType;
   questions: Question[];
   currentQuestionIndex: number;
   selectedOptionIndex: number | null;
@@ -37,7 +38,7 @@ interface GameState {
 
 type GameAction =
   | { type: 'SET_CATEGORY'; payload: string }
-  | { type: 'SET_DIFFICULTY'; payload: 'easy' | 'normal' | 'hard' }
+  | { type: 'SET_DIFFICULTY'; payload: DifficultyType }
   | { type: 'START_COUNTDOWN' }
   | { type: 'START_GAME'; payload: Question[] }
   | { type: 'ANSWER'; payload: { selectedIndex: number; isCorrect: boolean; scoreGain: number } }
@@ -107,28 +108,34 @@ function gameReducer(state: GameState, action: GameAction): GameState {
   }
 }
 
-const DIFFICULTY_COUNTS = {
+const DIFFICULTY_COUNTS: Record<DifficultyType, number> = {
   easy: 6,
   normal: 10,
   hard: 15,
+  super: 30,
+  all: 9999,
 };
 
-const DIFFICULTY_LABELS = {
-  easy: '簡單',
-  normal: '正常',
-  hard: '挑戰',
+const DIFFICULTY_LABELS: Record<DifficultyType, string> = {
+  easy: '簡單 (6題)',
+  normal: '標準 (10題)',
+  hard: '挑戰 (15題)',
+  super: '超強 (30題)',
+  all: '全部單字',
 };
 
 export default function Game() {
   const { words: allWords, categories, loading, error: wordError } = useWordLibrary();
   const { muted, toggleMute } = useSoundSettings();
 
-  // Keep a stable ref to allWords so the countdown useEffect can read the
-  // latest value without being re-triggered every time allWords changes.
+  const [orderMode, setOrderMode] = useState<QuestionOrderMode>('newest');
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null);
+
+  // Keep a stable ref to allWords
   const allWordsRef = useRef(allWords);
   useEffect(() => { allWordsRef.current = allWords; }, [allWords]);
 
-  // BGM lifecycle — play while this page is open, stop on unmount or mute
+  // BGM lifecycle
   useEffect(() => {
     if (!muted) startBGM();
     return () => stopBGM();
@@ -181,7 +188,10 @@ export default function Game() {
         const words = state.category === '全部'
           ? allWordsRef.current
           : allWordsRef.current.filter(w => w.category === state.category);
-        const q = generateQuestions(words, DIFFICULTY_COUNTS[state.difficulty]);
+        const count = state.difficulty === 'all'
+          ? words.length
+          : (DIFFICULTY_COUNTS[state.difficulty] || 10);
+        const q = generateQuestions(words, count, orderMode);
         dispatch({ type: 'START_GAME', payload: q });
       }, 4000);
 
@@ -193,7 +203,12 @@ export default function Game() {
       };
     }
     return undefined;
-  }, [state.phase, state.category, state.difficulty]);
+  }, [state.phase, state.category, state.difficulty, orderMode]);
+
+  // Reset pending option selection when question or phase changes
+  useEffect(() => {
+    setPendingIndex(null);
+  }, [state.currentQuestionIndex, state.phase]);
 
   useEffect(() => {
     if (state.phase === 'question' && state.selectedOptionIndex === null) {
@@ -275,6 +290,25 @@ export default function Game() {
     setTimeout(() => {
       dispatch({ type: 'NEXT_QUESTION' });
     }, 1500);
+  };
+
+  const handleOptionClick = (index: number) => {
+    if (state.selectedOptionIndex !== null) return;
+    const q = state.questions[state.currentQuestionIndex];
+    if (!q) return;
+
+    const opt = q.options[index];
+    const optionLabel = q.direction === 'en_to_zh' ? opt.chinese : opt.english;
+
+    if (pendingIndex !== index) {
+      // First click: select + speak TTS发音
+      setPendingIndex(index);
+      speakText(optionLabel);
+    } else {
+      // Second click: confirm answer
+      setPendingIndex(null);
+      handleAnswer(index);
+    }
   };
 
   // P0-D: 計算各分類可用單字數
@@ -372,14 +406,14 @@ export default function Game() {
         )}
       </div>
 
-      {/* 步驟 2：選擇難度 */}
-      <div ref={difficultyRef} className="mb-5 sm:mb-10 text-left scroll-mt-8">
-        <h2 className="text-lg sm:text-2xl font-black text-foreground mb-3 sm:mb-5 flex items-center gap-2 sm:gap-3">
+      {/* 步驟 2：選擇題數 */}
+      <div ref={difficultyRef} className="mb-5 sm:mb-8 text-left scroll-mt-8">
+        <h2 className="text-lg sm:text-2xl font-black text-foreground mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
           <span className="bg-secondary text-white w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full text-sm sm:text-lg shrink-0">2</span>
-          選擇難度
+          選擇題數
         </h2>
-        <div className="grid grid-cols-3 gap-2 sm:gap-3">
-          {(['easy', 'normal', 'hard'] as const).map(diff => (
+        <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
+          {(['easy', 'normal', 'hard', 'super', 'all'] as const).map(diff => (
             <button
               key={diff}
               data-testid={`difficulty-${diff}`}
@@ -387,10 +421,32 @@ export default function Game() {
                 dispatch({ type: 'SET_DIFFICULTY', payload: diff });
                 scrollToNext(startBtnRef);
               }}
-              className={`p-3 sm:p-5 rounded-2xl sm:rounded-3xl font-black text-sm sm:text-xl border-4 transition-all flex flex-col items-center justify-center gap-1 ${state.difficulty === diff ? 'bg-secondary text-secondary-foreground border-secondary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
+              className={`p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl font-black text-xs sm:text-lg border-4 transition-all flex flex-col items-center justify-center gap-1 ${state.difficulty === diff ? 'bg-secondary text-secondary-foreground border-secondary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
             >
               <span>{DIFFICULTY_LABELS[diff]}</span>
-              <span className="text-xs sm:text-sm opacity-80 font-bold">{DIFFICULTY_COUNTS[diff]} 題</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 步驟 3：選擇題目順序 */}
+      <div className="mb-5 sm:mb-8 text-left">
+        <h2 className="text-lg sm:text-2xl font-black text-foreground mb-3 sm:mb-4 flex items-center gap-2 sm:gap-3">
+          <span className="bg-secondary text-white w-7 h-7 sm:w-8 sm:h-8 flex items-center justify-center rounded-full text-sm sm:text-lg shrink-0">3</span>
+          題目排序
+        </h2>
+        <div className="grid grid-cols-3 gap-2 sm:gap-3">
+          {[
+            { id: 'newest', label: '🆕 最新單字優先' },
+            { id: 'random', label: '🎲 隨機混合' },
+            { id: 'oldest', label: '📜 依序出題' },
+          ].map(item => (
+            <button
+              key={item.id}
+              onClick={() => setOrderMode(item.id as QuestionOrderMode)}
+              className={`p-3 rounded-2xl sm:rounded-3xl font-black text-xs sm:text-base border-4 transition-all ${orderMode === item.id ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-lg -translate-y-0.5' : 'bg-card text-foreground border-border hover:bg-muted'}`}
+            >
+              {item.label}
             </button>
           ))}
         </div>
@@ -533,31 +589,37 @@ export default function Game() {
         </div>
 
         {/* Answers Grid */}
-        <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-5 w-full shrink-0 mt-auto">
-          {q.options.map((opt, i) => {
-            const isSelected = state.selectedOptionIndex === i;
-            const isCorrectAnswer = i === q.correctIndex;
-            const isCorrect = state.selectedOptionIndex !== null && isCorrectAnswer;
-            const isWrong = state.selectedOptionIndex !== null && isSelected && !isCorrectAnswer;
-            const disabled = state.selectedOptionIndex !== null;
-            // en_to_zh: prompt is English, answers are Chinese
-            // zh_to_en: prompt is Chinese, answers are English
-            const optionLabel = q.direction === 'en_to_zh' ? opt.chinese : opt.english;
+        <div className="w-full shrink-0 mt-auto flex flex-col gap-1.5">
+          <div className="text-center text-xs sm:text-sm font-bold text-white/90 drop-shadow mb-1 flex items-center justify-center gap-1">
+            <span>💡 點擊選項先聽發音，再按一次確認答案！</span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 md:gap-5 w-full">
+            {q.options.map((opt, i) => {
+              const isSelected = state.selectedOptionIndex === i;
+              const isCorrectAnswer = i === q.correctIndex;
+              const isCorrect = state.selectedOptionIndex !== null && isCorrectAnswer;
+              const isWrong = state.selectedOptionIndex !== null && isSelected && !isCorrectAnswer;
+              const disabled = state.selectedOptionIndex !== null;
+              // en_to_zh: prompt is English, answers are Chinese
+              // zh_to_en: prompt is Chinese, answers are English
+              const optionLabel = q.direction === 'en_to_zh' ? opt.chinese : opt.english;
 
-            return (
-              <AnswerButton
-                key={opt.id}
-                label={optionLabel}
-                slotIndex={i}
-                isSelected={isSelected}
-                isCorrect={isCorrect}
-                isWrong={isWrong}
-                disabled={disabled}
-                onClick={() => handleAnswer(i)}
-                testId={`answer-btn-${i}`}
-              />
-            );
-          })}
+              return (
+                <AnswerButton
+                  key={opt.id}
+                  label={optionLabel}
+                  slotIndex={i}
+                  isSelected={isSelected}
+                  isCorrect={isCorrect}
+                  isWrong={isWrong}
+                  isPendingConfirm={pendingIndex === i}
+                  disabled={disabled}
+                  onClick={() => handleOptionClick(i)}
+                  testId={`answer-btn-${i}`}
+                />
+              );
+            })}
+          </div>
         </div>
       </div>
     );

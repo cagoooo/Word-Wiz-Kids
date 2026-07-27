@@ -7,6 +7,7 @@ interface AnswerButtonProps {
   isSelected: boolean;
   isCorrect: boolean;
   isWrong: boolean;
+  isPendingConfirm?: boolean;
   disabled: boolean;
   onClick: () => void;
   testId: string;
@@ -20,16 +21,17 @@ const slotConfig: { bg: string; text: string; Icon: LucideIcon }[] = [
 ];
 
 export function AnswerButton({
-  label, slotIndex, isSelected, isCorrect, isWrong, disabled, onClick, testId,
+  label, slotIndex, isSelected, isCorrect, isWrong, isPendingConfirm, disabled, onClick, testId,
 }: AnswerButtonProps) {
   const config = slotConfig[slotIndex % 4];
   const { Icon } = config;
 
   let stateClasses = '';
-  if (isCorrect)       stateClasses = 'ring-4 ring-white scale-[1.05] z-10 brightness-110';
-  else if (isWrong)    stateClasses = 'opacity-50 grayscale';
-  else if (disabled)   stateClasses = 'opacity-60';
-  else                 stateClasses = 'hover:scale-[1.02] hover:brightness-110 active:scale-95';
+  if (isCorrect)            stateClasses = 'ring-4 ring-white scale-[1.05] z-10 brightness-110';
+  else if (isWrong)         stateClasses = 'opacity-50 grayscale';
+  else if (isPendingConfirm) stateClasses = 'ring-4 ring-yellow-300 shadow-[0_0_25px_rgba(250,204,21,0.9)] scale-[1.04] z-20 brightness-115 animate-pulse';
+  else if (disabled)        stateClasses = 'opacity-60';
+  else                      stateClasses = 'hover:scale-[1.02] hover:brightness-110 active:scale-95';
 
   const shakeAnimation = isWrong && isSelected ? { x: [-12, 12, -12, 12, 0] } : {};
 
@@ -55,6 +57,13 @@ export function AnswerButton({
           : 'hover:shadow-[0_8px_0_rgba(0,0,0,0.2)] hover:-translate-y-0.5 active:translate-y-2 active:shadow-none',
       ].join(' ')}
     >
+      {/* 待確認輔助浮籤 */}
+      {isPendingConfirm && (
+        <span className="absolute -top-3 right-3 bg-yellow-300 text-black text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded-full shadow-md border border-yellow-400 flex items-center gap-1 z-30 animate-bounce">
+          🔊 再按一次確認！
+        </span>
+      )}
+
       <div className="shrink-0">
         {/* ↓ 手機小圖示，桌機大圖示 */}
         <Icon className="w-4 h-4 sm:w-6 sm:h-6 md:w-14 md:h-14 fill-current opacity-90 drop-shadow-sm" />
