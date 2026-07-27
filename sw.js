@@ -1,9 +1,9 @@
-const CACHE_NAME = "vocab-kids-cache-v3";
+const CACHE_NAME = "vocab-kids-cache-v4";
 const ASSETS = [
-  "/",
-  "/index.html",
-  "/manifest.webmanifest",
-  "/icon.png"
+  "./",
+  "./index.html",
+  "./manifest.webmanifest",
+  "./icon.png"
 ];
 
 self.addEventListener("install", (event) => {
@@ -29,6 +29,15 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+
+  // Exclude dev tools, Vite client, and node_modules
+  if (
+    url.pathname.includes('/@vite') ||
+    url.pathname.includes('/@react-refresh') ||
+    url.pathname.includes('/node_modules')
+  ) {
+    return;
+  }
 
   // Network-first for API
   if (url.pathname.startsWith("/api")) {
