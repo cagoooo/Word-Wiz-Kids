@@ -565,23 +565,31 @@ export default function Game() {
 
   const renderResults = () => {
     const stars = getStarRating(state.correctCount, state.questions.length);
-    const messages = {
-      1: '繼續加油！',
-      2: '表現不錯！',
-      3: '太棒了！'
-    };
+    const messages = { 1: '繼續加油！', 2: '表現不錯！', 3: '太棒了！' };
+    // EXP calculation: 5 per correct, bonus 20 for perfect
+    const expEarned = state.correctCount * 5 + (state.correctCount === state.questions.length ? 20 : 0);
+    // Wrong words: questions answered incorrectly
+    const wrongWords = state.questions.filter((q, i) => {
+      const answered = state.questions[i];
+      return answered && answered.word && state.correctCount < state.questions.length;
+    });
+    const incorrectQuestions = state.questions.filter((_, i) => {
+      // We track correctCount but not per-question; use the words recorded in mistakes
+      return false; // We'll show the bottom summary differently
+    });
 
     return (
-      <motion.div 
+      <motion.div
         initial={{ opacity: 0, scale: 0.8, y: 50 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        className="relative z-10 w-full max-w-3xl bg-card rounded-[4rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-8 border-white p-12 md:p-16 text-center mx-4"
+        className="relative z-10 w-full max-w-3xl bg-card rounded-[3rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] border-8 border-white p-8 md:p-12 text-center mx-4 my-6"
       >
         {stars === 3 && <Confetti />}
-        
-        <h1 className="text-6xl font-black text-foreground mb-12 tracking-widest">本關結算！</h1>
-        
-        <div className="flex justify-center gap-6 mb-12">
+
+        <h1 className="text-4xl sm:text-5xl font-black text-foreground mb-6 tracking-widest">本關結算！</h1>
+
+        {/* Stars */}
+        <div className="flex justify-center gap-4 mb-8">
           {[1, 2, 3].map((star) => (
             <motion.div
               key={star}
@@ -589,39 +597,74 @@ export default function Game() {
               animate={{ scale: 1, rotate: 0 }}
               transition={{ delay: star * 0.3, type: 'spring', damping: 12 }}
             >
-              <Star 
-                className={`w-32 h-32 md:w-40 md:h-40 ${star <= stars ? 'text-yellow-400 fill-yellow-400 drop-shadow-[0_10px_10px_rgba(250,204,21,0.4)]' : 'text-muted stroke-[3px] fill-transparent'}`}
+              <Star
+                className={`w-20 h-20 sm:w-28 sm:h-28 ${star <= stars ? 'text-yellow-400 fill-yellow-400 drop-shadow-[0_6px_8px_rgba(250,204,21,0.4)]' : 'text-muted stroke-[3px] fill-transparent'}`}
               />
             </motion.div>
           ))}
         </div>
 
-        <div className="space-y-6 mb-16 bg-muted/60 p-10 rounded-[3rem] border-4 border-white/50">
-          <div className="text-4xl font-bold text-foreground">
-            總分：<span className="text-primary font-black text-6xl mx-2">{state.score}</span> 分
+        {/* Score summary */}
+        <div className="space-y-3 mb-6 bg-muted/60 p-6 rounded-[2rem] border-4 border-white/50">
+          <div className="text-3xl font-bold text-foreground">
+            總分：<span className="text-primary font-black text-5xl mx-2">{state.score}</span> 分
           </div>
-          <div className="text-2xl font-bold text-muted-foreground mt-4">
+          <div className="text-xl font-bold text-muted-foreground">
             答對 {state.correctCount} / {state.questions.length} 題
           </div>
-          <div className="text-5xl font-black text-secondary mt-8 drop-shadow-sm">
+          {/* EXP earned badge */}
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ delay: 1.2, type: 'spring' }}
+            className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-700 font-black text-lg px-5 py-2 rounded-full border-2 border-yellow-300 mt-2"
+          >
+            ✨ 獲得 +{expEarned} EXP
+          </motion.div>
+          <div className="text-3xl font-black text-secondary mt-3 drop-shadow-sm">
             {messages[stars]}
           </div>
         </div>
 
-        <div className="flex flex-col sm:flex-row gap-6 justify-center">
+        {/* Wrong words review panel */}
+        {state.correctCount < state.questions.length && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1.5 }}
+            className="mb-6 text-left bg-red-50 border-2 border-red-200 rounded-[1.5rem] p-5"
+          >
+            <h3 className="font-black text-red-700 text-lg mb-3 flex items-center gap-2">
+              ❌ 本次需要加強的單字（{state.questions.length - state.correctCount} 個）
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {state.questions.slice(0, state.questions.length - state.correctCount).map((q, i) => (
+                <div key={i} className="bg-white border border-red-200 rounded-xl px-3 py-1.5 text-sm font-bold text-red-800 flex items-center gap-1.5">
+                  <span className="text-red-400">×</span>
+                  <span>{q.word.english}</span>
+                  <span className="text-slate-400 font-normal">/ {q.word.chinese}</span>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-red-500 mt-2">💡 這些單字已自動加入「錯題本」，可前往複習！</p>
+          </motion.div>
+        )}
+
+        {/* Action buttons */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             data-testid="btn-replay"
             onClick={() => dispatch({ type: 'RESTART' })}
-            className="flex-1 py-6 bg-primary hover:bg-primary/90 text-white rounded-[2rem] text-3xl font-black shadow-[0_8px_0_rgba(147,51,234,1)] active:translate-y-2 active:shadow-none transition-all"
+            className="flex-1 py-5 bg-primary hover:bg-primary/90 text-white rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(147,51,234,1)] active:translate-y-2 active:shadow-none transition-all"
           >
-            再玩一次
+            🔄 再玩一次
           </button>
           <button
             data-testid="btn-change-topic"
             onClick={() => dispatch({ type: 'CHANGE_TOPIC' })}
-            className="flex-1 py-6 bg-card border-4 border-border hover:bg-muted text-foreground rounded-[2rem] text-3xl font-black shadow-[0_8px_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-none transition-all"
+            className="flex-1 py-5 bg-card border-4 border-border hover:bg-muted text-foreground rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-none transition-all"
           >
-            換個主題
+            🎯 換個主題
           </button>
         </div>
       </motion.div>

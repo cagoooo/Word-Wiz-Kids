@@ -14,6 +14,8 @@ import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
 import ArenaHost from '@/pages/ArenaHost';
 import ArenaPlayer from '@/pages/ArenaPlayer';
+import PhotoScan from '@/pages/PhotoScan';
+import ListenQuiz from '@/pages/ListenQuiz';
 
 import { SwUpdateBanner } from '@/components/SwUpdateBanner';
 
@@ -30,6 +32,8 @@ function Router() {
         <Route path="/game" component={Game} />
         <Route path="/arena/host" component={ArenaHost} />
         <Route path="/arena/player" component={ArenaPlayer} />
+        <Route path="/photo-scan" component={PhotoScan} />
+        <Route path="/listen-quiz" component={ListenQuiz} />
         <Route path="/leaderboard" component={Leaderboard} />
         <Route path="/admin" component={Admin} />
         <Route component={NotFound} />

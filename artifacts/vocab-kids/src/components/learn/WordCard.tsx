@@ -1,3 +1,4 @@
+import { useRef } from 'react';
 import { Volume2, RotateCcw } from 'lucide-react';
 import { Word } from '@/data/words';
 import { PhoneticHighlight } from './PhoneticHighlight';
@@ -8,15 +9,43 @@ interface WordCardProps {
   isFlipped: boolean;
   onFlip: () => void;
   onSpeak: () => void;
+  onNext?: () => void;
+  onPrev?: () => void;
 }
 
-export function WordCard({ word, isFlipped, onFlip, onSpeak }: WordCardProps) {
+export function WordCard({ word, isFlipped, onFlip, onSpeak, onNext, onPrev }: WordCardProps) {
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX.current;
+    const dy = e.changedTouches[0].clientY - touchStartY.current;
+    if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > 40) {
+      if (dx < 0 && onNext) onNext();
+      else if (dx > 0 && onPrev) onPrev();
+    }
+    touchStartX.current = null;
+    touchStartY.current = null;
+  };
+
+  // Dynamic font scaling based on word length
+  const wordLen = word.english.length;
+  const fontSize = wordLen <= 5 ? 'clamp(2.5rem,10vw,4rem)' : wordLen <= 8 ? 'clamp(2rem,8vw,3.2rem)' : 'clamp(1.5rem,6vw,2.5rem)';
+
   return (
     <div
       className="relative mx-auto cursor-pointer shrink-0"
       style={{ perspective: '1200px', minWidth: '300px', maxWidth: '420px', width: '100%', height: '420px' }}
       data-testid="word-card"
       onClick={onFlip}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
     >
       {/* Inner wrapper that flips */}
       <div
@@ -35,14 +64,16 @@ export function WordCard({ word, isFlipped, onFlip, onSpeak }: WordCardProps) {
           {/* Top gradient stripe */}
           <div className="absolute top-0 left-0 right-0 h-2 rounded-t-[2rem] bg-gradient-to-r from-purple-400 via-pink-400 to-violet-400" />
 
-          <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full text-center">
-            <PhoneticHighlight word={word} />
+          <div className="flex-1 flex flex-col items-center justify-center gap-4 w-full text-center">
+            <div style={{ fontSize }}>
+              <PhoneticHighlight word={word} />
+            </div>
             {word.phonetic && (
-              <p className="text-xl text-slate-400 dark:text-slate-500 font-mono tracking-widest">
+              <p className="text-lg text-slate-400 dark:text-slate-500 font-mono tracking-widest">
                 {word.phonetic}
               </p>
             )}
-            <p className="text-sm text-slate-400 font-medium mt-2">點擊卡片查看中文</p>
+            <p className="text-sm text-slate-400 font-medium">點擊卡片查看中文<br/><span className="text-xs opacity-60">← 左右滑動切換 →</span></p>
           </div>
 
           {/* Speak button */}

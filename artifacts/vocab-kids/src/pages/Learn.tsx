@@ -68,10 +68,26 @@ export default function Learn() {
     setReviewState("question");
   };
 
-  // Reset index when category changes
+  // P0-E: Restore last learning progress from localStorage on first load
   useEffect(() => {
+    try {
+      const saved = localStorage.getItem('learn-progress');
+      if (saved) {
+        const { index, category: savedCat } = JSON.parse(saved);
+        if (savedCat) setCategory(savedCat);
+        if (typeof index === 'number' && index >= 0) setCurrentIndex(index);
+      }
+    } catch { /* ignore */ }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Reset index when category changes (skip on first render - handled above)
+  const categoryChangedRef = { current: false };
+  useEffect(() => {
+    if (!categoryChangedRef.current) { categoryChangedRef.current = true; return; }
     setCurrentIndex(0);
     setIsFlipped(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [category]);
 
   // Start review when mode switches to review
@@ -95,13 +111,17 @@ export default function Learn() {
   const handlePrev = () => {
     sfxCardFlip();
     setIsFlipped(false);
-    setCurrentIndex(prev => (prev === 0 ? browseWords.length - 1 : prev - 1));
+    const newIdx = currentIndex === 0 ? browseWords.length - 1 : currentIndex - 1;
+    setCurrentIndex(newIdx);
+    localStorage.setItem('learn-progress', JSON.stringify({ index: newIdx, category }));
   };
 
   const handleNext = () => {
     sfxCardFlip();
     setIsFlipped(false);
-    setCurrentIndex(prev => (prev === browseWords.length - 1 ? 0 : prev + 1));
+    const newIdx = currentIndex === browseWords.length - 1 ? 0 : currentIndex + 1;
+    setCurrentIndex(newIdx);
+    localStorage.setItem('learn-progress', JSON.stringify({ index: newIdx, category }));
   };
 
   const handleNextReview = (known: boolean) => {
@@ -154,6 +174,8 @@ export default function Learn() {
                   isFlipped={isFlipped}
                   onFlip={() => setIsFlipped(!isFlipped)}
                   onSpeak={() => speakWord(currentBrowseWord.english)}
+                  onNext={handleNext}
+                  onPrev={handlePrev}
                 />
               </motion.div>
             </AnimatePresence>

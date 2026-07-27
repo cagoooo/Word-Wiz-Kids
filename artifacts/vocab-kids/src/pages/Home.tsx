@@ -1,6 +1,6 @@
 import { HeroScene } from '@/components/hero/HeroScene';
 import { motion } from 'framer-motion';
-import { Sparkles, ArrowRight, Star, BookOpen, Gamepad2, Trophy, Swords } from 'lucide-react';
+import { Sparkles, ArrowRight, Star, BookOpen, Gamepad2, Trophy, Swords, Camera, Headphones } from 'lucide-react';
 import { Link } from 'wouter';
 import { UserExpBar } from '@/components/gamification/UserExpBar';
 
@@ -61,6 +61,24 @@ export default function Home() {
               >
                 <Swords className="w-6 h-6 text-rose-200" />
                 <span>全班對戰</span>
+              </Link>
+
+              <Link
+                href="/photo-scan"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-violet-500/80 hover:bg-violet-500 text-white text-xl font-bold rounded-full backdrop-blur-md border border-violet-400/40 transition-all hover:scale-105 shadow-lg"
+                data-testid="link-photo-scan"
+              >
+                <Camera className="w-6 h-6 text-violet-200" />
+                <span>拍照識字</span>
+              </Link>
+
+              <Link
+                href="/listen-quiz"
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-cyan-500/80 hover:bg-cyan-500 text-white text-xl font-bold rounded-full backdrop-blur-md border border-cyan-400/40 transition-all hover:scale-105 shadow-lg"
+                data-testid="link-listen-quiz"
+              >
+                <Headphones className="w-6 h-6 text-cyan-200" />
+                <span>聽力測驗</span>
               </Link>
             </div>
           </motion.div>
