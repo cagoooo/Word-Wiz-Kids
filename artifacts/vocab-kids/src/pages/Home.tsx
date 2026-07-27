@@ -1,6 +1,6 @@
 import { HeroScene } from '@/components/hero/HeroScene';
 import { motion } from 'framer-motion';
-import { Sparkles, ArrowRight, Star, BookOpen, Gamepad2, Trophy } from 'lucide-react';
+import { Sparkles, ArrowRight, Star, BookOpen, Gamepad2, Trophy, Swords } from 'lucide-react';
 import { Link } from 'wouter';
 import { UserExpBar } from '@/components/gamification/UserExpBar';
 
@@ -51,7 +51,16 @@ export default function Home() {
                 data-testid="link-play-game"
               >
                 <Star className="w-6 h-6 text-yellow-300" />
-                <span>玩遊戲</span>
+                <span>單人挑戰</span>
+              </Link>
+
+              <Link 
+                href="/arena/player" 
+                className="inline-flex items-center justify-center gap-2 px-8 py-4 bg-rose-500/80 hover:bg-rose-500 text-white text-xl font-bold rounded-full backdrop-blur-md border border-rose-400/40 transition-all hover:scale-105 shadow-lg"
+                data-testid="link-arena-player"
+              >
+                <Swords className="w-6 h-6 text-rose-200" />
+                <span>全班對戰</span>
               </Link>
             </div>
           </motion.div>

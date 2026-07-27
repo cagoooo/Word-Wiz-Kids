@@ -8,9 +8,12 @@ import { Navbar } from '@/components/layout/Navbar';
 
 import Home from '@/pages/Home';
 import Learn from '@/pages/Learn';
+import Mistakes from '@/pages/Mistakes';
 import Game from '@/pages/Game';
 import Leaderboard from '@/pages/Leaderboard';
 import Admin from '@/pages/Admin';
+import ArenaHost from '@/pages/ArenaHost';
+import ArenaPlayer from '@/pages/ArenaPlayer';
 
 import { SwUpdateBanner } from '@/components/SwUpdateBanner';
 
@@ -23,7 +26,10 @@ function Router() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/learn" component={Learn} />
+        <Route path="/mistakes" component={Mistakes} />
         <Route path="/game" component={Game} />
+        <Route path="/arena/host" component={ArenaHost} />
+        <Route path="/arena/player" component={ArenaPlayer} />
         <Route path="/leaderboard" component={Leaderboard} />
         <Route path="/admin" component={Admin} />
         <Route component={NotFound} />

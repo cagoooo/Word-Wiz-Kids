@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'wouter';
-import { Menu, X, BookOpen, Gamepad2, Trophy, Settings, Sparkles } from 'lucide-react';
+import { Menu, X, BookOpen, Gamepad2, Trophy, Settings, Sparkles, BookMarked, Swords } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function Navbar() {
@@ -10,7 +10,9 @@ export function Navbar() {
   const navLinks = [
     { href: '/', label: '首頁', icon: Sparkles, testId: 'nav-home' },
     { href: '/learn', label: '學習', icon: BookOpen, testId: 'nav-learn' },
+    { href: '/mistakes', label: '錯題本', icon: BookMarked, testId: 'nav-mistakes' },
     { href: '/game', label: '遊戲', icon: Gamepad2, testId: 'nav-game' },
+    { href: '/arena/player', label: '對戰', icon: Swords, testId: 'nav-arena' },
     { href: '/leaderboard', label: '排行榜', icon: Trophy, testId: 'nav-leaderboard' },
     { href: '/admin', label: '管理', icon: Settings, testId: 'nav-admin' },
   ];

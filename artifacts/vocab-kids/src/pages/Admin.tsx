@@ -112,10 +112,13 @@ function PinPad({ onSuccess }: { onSuccess: () => void }) {
 
 // ── Dashboard tab ─────────────────────────────────────────────────────────────
 
+import { StudentDetailModal } from '@/components/admin/StudentDetailModal';
+
 function DashboardTab() {
   const [students, setStudents] = useState<StudentProgress[]>([]);
   const [wordCount, setWordCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedStudent, setSelectedStudent] = useState<StudentProgress | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -194,7 +197,13 @@ function DashboardTab() {
                 const avatarIdx = Math.max(0, Math.min((p.avatar ?? 1) - 1, 7));
                 const accuracy = p.questionsTotal > 0 ? Math.round((p.correctTotal / p.questionsTotal) * 100) : 0;
                 return (
-                  <div key={p.studentId} className="grid grid-cols-5 gap-3 items-center p-3 border-b border-border last:border-0 hover:bg-muted/30 transition-colors" data-testid={`admin-student-row-${idx}`}>
+                  <div
+                    key={p.studentId}
+                    onClick={() => setSelectedStudent(p)}
+                    className="grid grid-cols-5 gap-3 items-center p-3 border-b border-border last:border-0 hover:bg-primary/5 cursor-pointer transition-colors"
+                    title="點擊查看該學生詳細學習歷程分析"
+                    data-testid={`admin-student-row-${idx}`}
+                  >
                     <div className="col-span-2 flex items-center gap-3">
                       <div className={`w-8 h-8 ${AVATAR_COLORS[avatarIdx]} rounded-full flex items-center justify-center text-white text-xs font-black flex-shrink-0`}>
                         {AVATAR_INITIALS[avatarIdx]}
@@ -217,6 +226,8 @@ function DashboardTab() {
               </div>
             </div>
           )}
+
+          <StudentDetailModal student={selectedStudent} onClose={() => setSelectedStudent(null)} />
 
           {students.length === 0 && (
             <div className="py-12 text-center bg-card rounded-2xl border border-dashed border-border">

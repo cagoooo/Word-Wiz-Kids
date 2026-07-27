@@ -18,6 +18,7 @@ import { useSoundSettings } from '@/hooks/useSoundSettings';
 import { UserExpBar } from '@/components/gamification/UserExpBar';
 import { AudioButton } from '@/components/ui/AudioButton';
 import { addExp, getUserStats, saveUserStats } from '@/lib/gamification';
+import { recordMistake } from '@/lib/mistakes';
 
 type GamePhase = 'select' | 'countdown' | 'question' | 'results';
 
@@ -257,7 +258,12 @@ export default function Game() {
 
     const q = state.questions[state.currentQuestionIndex];
     const isCorrect = index === q.correctIndex;
-    if (isCorrect) sfxCorrect(); else sfxWrong();
+    if (isCorrect) {
+      sfxCorrect();
+    } else {
+      sfxWrong();
+      recordMistake(q.options[q.correctIndex]); // Record correct target word as mistake for review
+    }
 
     // Always speak the English word to reinforce pronunciation regardless of direction
     speakWord(q.options[index].english);

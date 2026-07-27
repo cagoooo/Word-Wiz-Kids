@@ -118,7 +118,7 @@ export default function Learn() {
   const renderBrowse = () => {
     if (!currentBrowseWord) return null;
     return (
-      <div className="flex-1 flex flex-col items-center w-full mt-4">
+      <div className="w-full flex flex-col items-center mt-4">
         <div className="w-full flex items-center justify-between max-w-md mb-6 px-4">
           <span className="text-sm font-bold text-muted-foreground bg-muted px-4 py-1.5 rounded-full shadow-sm">
             已學習 {seenIds.size} 個
