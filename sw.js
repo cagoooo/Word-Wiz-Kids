@@ -1,12 +1,12 @@
-const CACHE_NAME = "vocab-kids-cache-v17";
+const CACHE_NAME = "vocab-kids-cache-v18";
 const ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest?v=8",
-  "./icon.png?v=8",
-  "./favicon.png?v=8",
-  "./favicon.svg?v=8",
-  "./og-image.png?v=8"
+  "./manifest.webmanifest?v=9",
+  "./icon.png?v=9",
+  "./favicon.png?v=9",
+  "./favicon.svg?v=9",
+  "./og-image.png?v=9"
 ];
 
 // Force SW skipWaiting on explicit user click message only
@@ -36,6 +36,7 @@ self.addEventListener("activate", (event) => {
   );
 });
 
+// Network-First for ALL requests to completely eliminate stale cache issues
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
@@ -48,35 +49,15 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  // Network-first for API
-  if (url.pathname.startsWith("/api")) {
-    event.respondWith(
-      fetch(event.request)
-        .then((response) => {
-          const resClone = response.clone();
-          caches.open(CACHE_NAME).then((cache) => {
-            cache.put(event.request, resClone);
-          });
-          return response;
-        })
-        .catch(() => caches.match(event.request))
-    );
-    return;
-  }
-
-  // Cache-first for static assets
   event.respondWith(
-    caches.match(event.request).then((cachedResponse) => {
-      return cachedResponse || fetch(event.request).then(response => {
-        if (!response || response.status !== 200 || response.type !== 'basic') {
-          return response;
+    fetch(event.request)
+      .then((networkResponse) => {
+        if (networkResponse && networkResponse.status === 200) {
+          const responseClone = networkResponse.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
         }
-        const responseToCache = response.clone();
-        caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, responseToCache);
-        });
-        return response;
-      });
-    })
+        return networkResponse;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
