@@ -1,4 +1,4 @@
-import { Word } from '../data/words';
+import type { Word } from '../data/words';
 
 export type QuestionDirection = 'en_to_zh' | 'zh_to_en';
 
@@ -12,6 +12,35 @@ export interface Question {
 }
 
 export type QuestionOrderMode = 'random' | 'newest' | 'oldest';
+
+function normalizeOptionLabel(value: string): string {
+  return value.normalize('NFKC').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function getOptionLabel(word: Word, direction: QuestionDirection): string {
+  return direction === 'en_to_zh' ? word.chinese : word.english;
+}
+
+function getDistinctDistractors(
+  words: Word[],
+  correctWord: Word,
+  direction: QuestionDirection,
+): Word[] {
+  const usedLabels = new Set([normalizeOptionLabel(getOptionLabel(correctWord, direction))]);
+
+  return [...words]
+    .sort(() => Math.random() - 0.5)
+    .filter((word) => {
+      if (word.id === correctWord.id) return false;
+
+      const label = normalizeOptionLabel(getOptionLabel(word, direction));
+      if (!label || usedLabels.has(label)) return false;
+
+      usedLabels.add(label);
+      return true;
+    })
+    .slice(0, 3);
+}
 
 export function generateQuestions(
   words: Word[],
@@ -33,21 +62,25 @@ export function generateQuestions(
   }
 
   return selectedWords.map((correctWord) => {
-    // Pick distractors
-    const otherWords = words.filter(w => w.id !== correctWord.id);
-    const shuffledOthers = [...otherWords].sort(() => Math.random() - 0.5);
+    // Choose a direction first so duplicate visible labels (even with different IDs)
+    // can never appear as separate answers, e.g. "Ball" / "ball" or two "球" entries.
+    let direction: QuestionDirection = Math.random() < 0.5 ? 'en_to_zh' : 'zh_to_en';
+    let distractors = getDistinctDistractors(words, correctWord, direction);
 
-    // If pool has < 4 words, use what is available
-    const numDistractors = Math.min(3, shuffledOthers.length);
-    const distractors = shuffledOthers.slice(0, numDistractors);
+    // Prefer the other direction when it can provide a complete four-choice set.
+    if (distractors.length < 3) {
+      const alternateDirection: QuestionDirection = direction === 'en_to_zh' ? 'zh_to_en' : 'en_to_zh';
+      const alternateDistractors = getDistinctDistractors(words, correctWord, alternateDirection);
+      if (alternateDistractors.length > distractors.length) {
+        direction = alternateDirection;
+        distractors = alternateDistractors;
+      }
+    }
 
     const options = [correctWord, ...distractors];
     // Shuffle options
     const shuffledOptions = [...options].sort(() => Math.random() - 0.5);
     const correctIndex = shuffledOptions.findIndex(w => w.id === correctWord.id);
-
-    // Randomly alternate direction for variety
-    const direction: QuestionDirection = Math.random() < 0.5 ? 'en_to_zh' : 'zh_to_en';
 
     return {
       word: correctWord,

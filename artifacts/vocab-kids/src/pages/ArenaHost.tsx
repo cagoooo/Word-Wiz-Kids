@@ -66,6 +66,13 @@ export default function ArenaHost() {
     return unsubscribe;
   }, [pin]);
 
+  const players = Object.values(room?.players ?? {});
+  const sortedPlayers = [...players].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt);
+  const currentQuestion = room?.questions[room.currentQuestionIndex];
+  const answeredCount = room
+    ? players.filter((player) => player.answerQuestionIndex === room.currentQuestionIndex).length
+    : 0;
+
   useEffect(() => {
     if (!pin || !room || room.status !== 'question') return;
     timerTransitionedRef.current = false;
@@ -88,6 +95,23 @@ export default function ArenaHost() {
     return () => window.clearInterval(interval);
   }, [pin, room?.status, room?.currentQuestionIndex, room?.questionStartedAt, room?.questionDurationMs, serverTimeOffsetMs]);
 
+  useEffect(() => {
+    if (
+      !pin
+      || !room
+      || room.status !== 'question'
+      || players.length === 0
+      || answeredCount < players.length
+      || timerTransitionedRef.current
+    ) return;
+
+    timerTransitionedRef.current = true;
+    void updateArenaStatus(pin, 'leaderboard').catch(() => {
+      timerTransitionedRef.current = false;
+      setError('全班都已作答，但無法結束本題，請再試一次');
+    });
+  }, [pin, room?.status, room?.currentQuestionIndex, answeredCount, players.length]);
+
   const handleCreateRoom = async () => {
     setCreating(true);
     setError('');
@@ -101,13 +125,6 @@ export default function ArenaHost() {
       setCreating(false);
     }
   };
-
-  const players = Object.values(room?.players ?? {});
-  const sortedPlayers = [...players].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt);
-  const currentQuestion = room?.questions[room.currentQuestionIndex];
-  const answeredCount = room
-    ? players.filter((player) => player.answerQuestionIndex === room.currentQuestionIndex).length
-    : 0;
 
   const handleNext = async () => {
     if (!room || !pin) return;
