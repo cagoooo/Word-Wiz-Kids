@@ -1,7 +1,7 @@
-const CACHE_NAME = "vocab-kids-cache-v20";
+// CI 會在每次部署後注入唯一版本，確保 sw.js bytes 必定改變並觸發 updatefound。
+const BUILD_VERSION = "__BUILD_VERSION__";
+const CACHE_NAME = `vocab-kids-${BUILD_VERSION}`;
 const ASSETS = [
-  "./",
-  "./index.html",
   "./manifest.webmanifest?v=10",
   "./icon.png?v=10",
   "./favicon.png?v=10",
@@ -33,6 +33,12 @@ self.addEventListener("activate", (event) => {
         keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())
+      .then(() => self.clients.matchAll({ includeUncontrolled: true }))
+      .then((clients) => {
+        clients.forEach((client) => {
+          client.postMessage({ type: "SW_ACTIVATED", version: BUILD_VERSION });
+        });
+      })
   );
 });
 
@@ -40,8 +46,11 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
-  // Exclude dev tools, Vite client, and node_modules
+  // 只處理一般網路 GET；version.json 永遠交給網路，避免輪詢結果被 SW 快取。
   if (
+    event.request.method !== "GET" ||
+    (url.protocol !== "http:" && url.protocol !== "https:") ||
+    url.pathname.endsWith("/version.json") ||
     url.pathname.includes('/@vite') ||
     url.pathname.includes('/@react-refresh') ||
     url.pathname.includes('/node_modules')
@@ -53,6 +62,7 @@ self.addEventListener("fetch", (event) => {
     fetch(event.request)
       .then((networkResponse) => {
         if (networkResponse && networkResponse.status === 200) {
+          if (networkResponse.type === "opaque") return networkResponse;
           const responseClone = networkResponse.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, responseClone));
         }

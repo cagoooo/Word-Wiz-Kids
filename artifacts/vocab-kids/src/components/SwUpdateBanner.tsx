@@ -4,20 +4,30 @@ import { RefreshCw, Sparkles, X } from 'lucide-react';
 export const SwUpdateBanner: React.FC = () => {
   const [show, setShow] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
+  const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     const handleSwUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<{ worker: ServiceWorker }>;
-      if (customEvent.detail && customEvent.detail.worker) {
-        setWaitingWorker(customEvent.detail.worker);
+      const customEvent = e as CustomEvent<{ worker: ServiceWorker | null }>;
+      if (customEvent.detail) {
+        setWaitingWorker(customEvent.detail.worker || null);
+        setRecovering(false);
         setShow(true);
       }
     };
 
+    const handleChunkRecovery = () => {
+      setWaitingWorker(null);
+      setRecovering(true);
+      setShow(true);
+    };
+
     window.addEventListener('swUpdateAvailable', handleSwUpdate);
+    window.addEventListener('chunkRecoveryStarted', handleChunkRecovery);
 
     return () => {
       window.removeEventListener('swUpdateAvailable', handleSwUpdate);
+      window.removeEventListener('chunkRecoveryStarted', handleChunkRecovery);
     };
   }, []);
 
@@ -87,13 +97,15 @@ export const SwUpdateBanner: React.FC = () => {
 
           <div className="flex-1 min-w-0 pr-2">
             <h4 className="font-bold text-base text-amber-300 flex items-center gap-1.5">
-              發現新版單字小英雄！
+              {recovering ? '正在同步最新版本…' : '發現新版單字小英雄！'}
             </h4>
             <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-              系統已推出最新學習關卡與體驗優化，點擊下方按鈕即可載入最新版本。
+              {recovering
+                ? '偵測到網站檔案已更新，正在清除舊版快取並自動重新載入。'
+                : '點一下更新，避免繼續使用舊版畫面或舊資料流程。'}
             </p>
 
-            <div className="mt-3.5 flex items-center gap-2">
+            {!recovering && <div className="mt-3.5 flex items-center gap-2">
               <button
                 onClick={handleReload}
                 className="flex-1 py-2 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-purple-600 hover:from-amber-400 hover:to-purple-500 text-slate-950 font-bold text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
@@ -109,7 +121,7 @@ export const SwUpdateBanner: React.FC = () => {
               >
                 <X className="w-4 h-4" />
               </button>
-            </div>
+            </div>}
           </div>
         </div>
       </div>
