@@ -56,7 +56,7 @@ export const SwUpdateBanner: React.FC = () => {
   if (!show) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-50 max-w-md w-full px-4 animate-in slide-in-from-bottom-5 duration-300">
+    <div className="fixed inset-x-4 bottom-[max(1.25rem,env(safe-area-inset-bottom))] z-50 mx-auto w-auto max-w-md animate-in slide-in-from-bottom-5 duration-300 sm:left-auto sm:right-5 sm:bottom-5 sm:mx-0 sm:w-[calc(100%-2.5rem)]">
       <div className="relative overflow-hidden rounded-2xl bg-slate-900/90 backdrop-blur-xl border border-purple-500/30 p-5 shadow-2xl shadow-purple-950/50 text-white">
         {/* Glow effect */}
         <div className="absolute -top-10 -right-10 w-24 h-24 bg-purple-500/30 blur-2xl rounded-full pointer-events-none" />
