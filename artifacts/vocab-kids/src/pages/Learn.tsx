@@ -19,7 +19,7 @@ export default function Learn() {
 
   // BGM lifecycle — play while on this page, stop on unmount or mute
   useEffect(() => {
-    if (!muted) startBGM();
+    if (!muted) startBGM('learn');
     return () => stopBGM();
   }, [muted]);
 

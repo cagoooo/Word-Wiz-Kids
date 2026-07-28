@@ -14,11 +14,13 @@ import {
 } from '@/lib/realtimeArena';
 import { AVATAR_EMOJIS } from '@/components/student/NicknameSetup';
 import { AudioButton } from '@/components/ui/AudioButton';
-import { sfxLevelComplete } from '@/lib/soundEngine';
+import { sfxLevelComplete, startBGM, stopBGM } from '@/lib/soundEngine';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
+import { useSoundSettings } from '@/hooks/useSoundSettings';
 
 export default function ArenaHost() {
   const { words, categories, loading, error: wordError } = useWordLibrary();
+  const { muted } = useSoundSettings();
   const [category, setCategory] = useState('全部');
   const [questionCount, setQuestionCount] = useState(5);
   const [pin, setPin] = useState<string | null>(() => sessionStorage.getItem(ARENA_HOST_SESSION_KEY));
@@ -28,6 +30,11 @@ export default function ArenaHost() {
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const timerTransitionedRef = useRef(false);
+
+  useEffect(() => {
+    if (pin && !muted) startBGM('arena');
+    return () => stopBGM();
+  }, [pin, muted]);
 
   const categoryWords = useMemo(
     () => category === '全部' ? words : words.filter((word) => word.category === category),

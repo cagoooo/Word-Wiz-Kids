@@ -4,9 +4,10 @@ import { ArrowLeft, CheckCircle2, Gamepad2, Loader2, Sparkles, Trophy, XCircle }
 import { Link } from 'wouter';
 import { joinArenaRoom, subscribeArenaRoom, subscribeArenaServerTimeOffset, submitArenaAnswer, type ArenaRoom } from '@/lib/realtimeArena';
 import { getArenaTimeState } from '@/lib/arenaScoring';
-import { sfxCorrect, sfxWrong } from '@/lib/soundEngine';
+import { sfxCorrect, sfxWrong, startBGM, stopBGM } from '@/lib/soundEngine';
 import { speakText, speakWord } from '@/lib/tts';
 import { loadStudent } from '@/hooks/useStudent';
+import { useSoundSettings } from '@/hooks/useSoundSettings';
 import { AVATAR_COLORS, AVATAR_EMOJIS } from '@/components/student/NicknameSetup';
 
 const PLAYER_SESSION_KEY = 'word-wiz-arena-player';
@@ -29,6 +30,7 @@ function loadSavedSession(): SavedArenaPlayer | null {
 
 export default function ArenaPlayer() {
   const savedSession = useMemo(loadSavedSession, []);
+  const { muted } = useSoundSettings();
   const [pin, setPin] = useState(savedSession?.pin ?? '');
   const [hero] = useState(() => loadStudent());
   const [joined, setJoined] = useState(Boolean(savedSession));
@@ -42,6 +44,11 @@ export default function ArenaPlayer() {
   const [now, setNow] = useState(Date.now());
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    if (joined && !muted) startBGM('arena');
+    return () => stopBGM();
+  }, [joined, muted]);
 
   const handleJoin = async (event: React.FormEvent) => {
     event.preventDefault();

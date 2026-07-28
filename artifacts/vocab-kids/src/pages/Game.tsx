@@ -141,7 +141,7 @@ export default function Game() {
 
   // BGM lifecycle
   useEffect(() => {
-    if (!muted) startBGM();
+    if (!muted) startBGM('game');
     return () => stopBGM();
   }, [muted]);
 
