@@ -1,17 +1,44 @@
 import { createRoot } from 'react-dom/client';
 
 import App from './App';
+import { isNewerBuildVersion } from './lib/pwaVersion';
 
 import './index.css';
 
 const APP_VERSION = import.meta.env.VITE_BUILD_VERSION || 'development';
 const CHUNK_RECOVERY_FLAG = 'vocab-kids-chunk-reload-attempted';
+const UPDATE_REQUESTED_KEY = 'vocab-kids-sw-update-requested';
 const CHUNK_ERROR_PATTERN = /Loading chunk|Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError/i;
+let lastAnnouncedVersion = '';
 
-function announceUpdate(worker: ServiceWorker | null, version?: string) {
+function getWorkerVersion(worker: ServiceWorker): Promise<string | null> {
+  return new Promise((resolve) => {
+    try {
+      const channel = new MessageChannel();
+      const timeout = window.setTimeout(() => resolve(null), 1500);
+      channel.port1.onmessage = (event) => {
+        window.clearTimeout(timeout);
+        resolve(typeof event.data?.version === 'string' ? event.data.version : null);
+      };
+      worker.postMessage({ type: 'GET_VERSION' }, [channel.port2]);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+function announceUpdate(worker: ServiceWorker | null, version: string) {
+  if (!isNewerBuildVersion(version, APP_VERSION) || version === lastAnnouncedVersion) return;
+  lastAnnouncedVersion = version;
   window.dispatchEvent(
     new CustomEvent('swUpdateAvailable', { detail: { worker, version } })
   );
+}
+
+async function announceWaitingWorker(worker: ServiceWorker | null) {
+  if (!worker) return;
+  const version = await getWorkerVersion(worker);
+  if (version) announceUpdate(worker, version);
 }
 
 async function recoverFromChunkError(message: string) {
@@ -68,8 +95,16 @@ if ('serviceWorker' in navigator) {
     });
 
     navigator.serviceWorker.addEventListener('message', (event) => {
-      if (event.data?.type === 'SW_ACTIVATED' && event.data.version !== APP_VERSION) {
-        announceUpdate(null, event.data.version);
+      if (event.data?.type === 'SW_ACTIVATED' && typeof event.data.version === 'string') {
+        let requestedVersion = '';
+        try {
+          requestedVersion = sessionStorage.getItem(UPDATE_REQUESTED_KEY) || '';
+        } catch {
+          // sessionStorage 不可用時仍以版本閘門去重。
+        }
+        if (requestedVersion !== event.data.version) {
+          announceUpdate(null, event.data.version);
+        }
       }
     });
 
@@ -91,13 +126,13 @@ if ('serviceWorker' in navigator) {
         const watchWorker = (worker: ServiceWorker) => {
           worker.addEventListener('statechange', () => {
             if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              announceUpdate(worker);
+              void announceWaitingWorker(worker);
             }
           });
         };
 
         if (registration.waiting) {
-          announceUpdate(registration.waiting);
+          void announceWaitingWorker(registration.waiting);
         }
 
         if (registration.installing) watchWorker(registration.installing);
@@ -119,8 +154,10 @@ if ('serviceWorker' in navigator) {
         const response = await fetch(versionUrl, { cache: 'no-store' });
         if (!response.ok) return;
         const data = await response.json() as { version?: string };
-        if (APP_VERSION !== 'development' && data.version && data.version !== APP_VERSION) {
-          announceUpdate(activeRegistration?.waiting || null, data.version);
+        if (APP_VERSION !== 'development' && data.version && isNewerBuildVersion(data.version, APP_VERSION)) {
+          if (activeRegistration?.waiting) {
+            await announceWaitingWorker(activeRegistration.waiting);
+          }
         }
       } catch {
         // 離線時靜默略過，下次 focus / online / interval 會再檢查。

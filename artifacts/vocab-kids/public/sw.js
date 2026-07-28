@@ -1,4 +1,4 @@
-// CI 會在每次部署後注入唯一版本，確保 sw.js bytes 必定改變並觸發 updatefound。
+// CI 注入「workflow run number + commit hash」；同一 commit 重跑時版本保持不變。
 const BUILD_VERSION = "__BUILD_VERSION__";
 const CACHE_NAME = `vocab-kids-${BUILD_VERSION}`;
 const ASSETS = [
@@ -11,7 +11,9 @@ const ASSETS = [
 
 // Force SW skipWaiting on explicit user click message only
 self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
+  if (event.data && event.data.type === "GET_VERSION") {
+    event.ports[0]?.postMessage({ version: BUILD_VERSION });
+  } else if (event.data && event.data.type === "SKIP_WAITING") {
     self.skipWaiting();
   }
 });

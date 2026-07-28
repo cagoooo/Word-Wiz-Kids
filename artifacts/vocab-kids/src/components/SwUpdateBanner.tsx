@@ -4,13 +4,15 @@ import { RefreshCw, Sparkles, X } from 'lucide-react';
 export const SwUpdateBanner: React.FC = () => {
   const [show, setShow] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
+  const [updateVersion, setUpdateVersion] = useState('');
   const [recovering, setRecovering] = useState(false);
 
   useEffect(() => {
     const handleSwUpdate = (e: Event) => {
-      const customEvent = e as CustomEvent<{ worker: ServiceWorker | null }>;
+      const customEvent = e as CustomEvent<{ worker: ServiceWorker | null; version: string }>;
       if (customEvent.detail) {
         setWaitingWorker(customEvent.detail.worker || null);
+        setUpdateVersion(customEvent.detail.version || '');
         setRecovering(false);
         setShow(true);
       }
@@ -31,55 +33,24 @@ export const SwUpdateBanner: React.FC = () => {
     };
   }, []);
 
-  const handleReload = async () => {
+  const handleReload = () => {
     setShow(false);
-
-    let reloadTriggered = false;
-    const onControllerChange = () => {
-      if (!reloadTriggered) {
-        reloadTriggered = true;
-        window.location.reload();
-      }
-    };
-
-    // 1. Listen for SW controller takeover
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('controllerchange', onControllerChange);
+    try {
+      if (updateVersion) sessionStorage.setItem('vocab-kids-sw-update-requested', updateVersion);
+    } catch {
+      // sessionStorage 不可用不影響正常更新。
     }
 
-    // 2. Clear all cache storage entries
-    if ('caches' in window) {
-      try {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((key) => caches.delete(key)));
-      } catch (err) {
-        console.warn('Error clearing caches on SW update:', err);
-      }
-    }
-
-    // 3. Post SKIP_WAITING to waiting worker
+    // 保留新版 SW 在 install 階段建立的 cache；只要求 waiting worker 接管。
     if (waitingWorker) {
       waitingWorker.postMessage({ type: 'SKIP_WAITING' });
+      // main.tsx 會在 controllerchange 時重新載入；較寬鬆的 fallback 避免行動裝置切換較慢時誤判。
+      window.setTimeout(() => window.location.reload(), 8000);
+      return;
     }
 
-    // 4. Safety fallback timeout: if controllerchange doesn't fire in 500ms, unregister SW & force reload
-    setTimeout(() => {
-      if (!reloadTriggered) {
-        reloadTriggered = true;
-        if ('serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistrations().then((registrations) => {
-            for (const reg of registrations) {
-              reg.unregister();
-            }
-            window.location.reload();
-          }).catch(() => {
-            window.location.reload();
-          });
-        } else {
-          window.location.reload();
-        }
-      }
-    }, 500);
+    // 其他分頁已先啟用新版 SW 時只需重新載入，不註銷 SW、不清除全部 cache。
+    window.location.reload();
   };
 
   if (!show) return null;

@@ -43,9 +43,11 @@ jobs:
           VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}
           EOF
 
-      - name: Generate unique build version 🏷️
+      - name: Generate stable release version 🏷️
         run: |
-          BUILD_VERSION="${GITHUB_SHA::7}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          # 同一 commit 重新執行 workflow 時版本必須保持不變，避免產生假 SW 更新。
+          # run number 可排序，讓前端能拒絕 CDN 暫時回送的舊版 sw.js。
+          BUILD_VERSION="${GITHUB_RUN_NUMBER}-${GITHUB_SHA::12}"
           echo "BUILD_VERSION=${BUILD_VERSION}" >> "$GITHUB_ENV"
           echo "VITE_BUILD_VERSION=${BUILD_VERSION}" >> "$GITHUB_ENV"
 
@@ -67,6 +69,18 @@ jobs:
           sed -i "s/__BUILD_VERSION__/${BUILD_VERSION}/g" ./artifacts/vocab-kids/dist/public/version.json
           if grep -q '__BUILD_VERSION__' ./artifacts/vocab-kids/dist/public/sw.js ./artifacts/vocab-kids/dist/public/version.json; then
             echo "::error::PWA build version sentinel was not replaced"
+            exit 1
+          fi
+          if ! grep -Eq 'const BUILD_VERSION = "[0-9]+-[0-9a-f]{12}";' ./artifacts/vocab-kids/dist/public/sw.js; then
+            echo "::error::Service Worker build version is not stable/sortable"
+            exit 1
+          fi
+          if ! grep -Fq "\"version\": \"${BUILD_VERSION}\"" ./artifacts/vocab-kids/dist/public/version.json; then
+            echo "::error::version.json does not match Service Worker build version"
+            exit 1
+          fi
+          if ! grep -Fq 'GET_VERSION' ./artifacts/vocab-kids/dist/public/sw.js; then
+            echo "::error::Service Worker does not expose GET_VERSION"
             exit 1
           fi
 
