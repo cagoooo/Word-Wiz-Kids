@@ -11,7 +11,7 @@ import { PhoneticHighlight } from '@/components/learn/PhoneticHighlight';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
 import { UserExpBar } from '@/components/gamification/UserExpBar';
 import { AudioButton } from '@/components/ui/AudioButton';
-import { addExp } from '@/lib/gamification';
+import { recordWordLearned } from '@/lib/gamification';
 
 export default function Learn() {
   const { words: allWords, categories, loading, error: wordError } = useWordLibrary();
@@ -102,6 +102,7 @@ export default function Learn() {
   useEffect(() => {
     if (!(mode === 'browse' && currentBrowseWord)) return;
     setSeenIds(prev => new Set(prev).add(currentBrowseWord.id));
+    recordWordLearned(currentBrowseWord.id);
     const timer = setTimeout(() => {
       speakWord(currentBrowseWord.english);
     }, 300);
@@ -125,7 +126,12 @@ export default function Learn() {
   };
 
   const handleNextReview = (known: boolean) => {
-    if (known) { sfxCorrect(); setKnownCount(prev => prev + 1); }
+    if (known) {
+      sfxCorrect();
+      setKnownCount(prev => prev + 1);
+      const reviewedWord = reviewWords[reviewIndex];
+      if (reviewedWord) recordWordLearned(reviewedWord.id);
+    }
     else sfxWrong();
     if (reviewIndex === reviewWords.length - 1) {
       setReviewState('summary');

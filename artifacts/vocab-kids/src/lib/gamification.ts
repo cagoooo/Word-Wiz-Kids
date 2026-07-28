@@ -17,13 +17,16 @@ export interface UserStats {
   streak: number;
   lastLoginDate: string; // YYYY-MM-DD
   wordsLearned: number;
+  learnedWordIds: string[];
   gamesPlayed: number;
   perfectGames: number;
   highestScore: number;
   badges: string[]; // Badge IDs
+  pendingBadges: string[];
 }
 
 const STORAGE_KEY = 'vocab-gamification-stats';
+export const GAMIFICATION_UPDATED_EVENT = 'vocab-gamification-updated';
 
 export const ALL_BADGES: Omit<Badge, 'unlocked'>[] = [
   { id: 'first_step', name: '初露鋒芒', desc: '完成第一次單字學習或測驗', icon: '🚀' },
@@ -38,7 +41,10 @@ export const ALL_BADGES: Omit<Badge, 'unlocked'>[] = [
 
 export function getTodayString(): string {
   const now = new Date();
-  return now.toISOString().split('T')[0];
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 export function calculateLevel(exp: number): { level: number; currentExp: number; maxExp: number } {
@@ -56,41 +62,74 @@ export function calculateLevel(exp: number): { level: number; currentExp: number
   return { level, currentExp: remainingExp, maxExp: req };
 }
 
+function createDefaultStats(exp = 50): UserStats {
+  return {
+    exp,
+    level: 1,
+    streak: 1,
+    lastLoginDate: getTodayString(),
+    wordsLearned: 0,
+    learnedWordIds: [],
+    gamesPlayed: 0,
+    perfectGames: 0,
+    highestScore: 0,
+    badges: [],
+    pendingBadges: [],
+  };
+}
+
+function normalizeStats(value: Partial<UserStats>): UserStats {
+  const defaults = createDefaultStats();
+  const knownBadgeIds = new Set(ALL_BADGES.map((badge) => badge.id));
+  return {
+    ...defaults,
+    ...value,
+    exp: Number.isFinite(value.exp) ? Math.max(0, Number(value.exp)) : defaults.exp,
+    streak: Number.isFinite(value.streak) ? Math.max(1, Number(value.streak)) : 1,
+    wordsLearned: Number.isFinite(value.wordsLearned) ? Math.max(0, Number(value.wordsLearned)) : 0,
+    gamesPlayed: Number.isFinite(value.gamesPlayed) ? Math.max(0, Number(value.gamesPlayed)) : 0,
+    perfectGames: Number.isFinite(value.perfectGames) ? Math.max(0, Number(value.perfectGames)) : 0,
+    highestScore: Number.isFinite(value.highestScore) ? Math.max(0, Number(value.highestScore)) : 0,
+    learnedWordIds: Array.isArray(value.learnedWordIds)
+      ? [...new Set(value.learnedWordIds.filter((id): id is string => typeof id === 'string' && id.length > 0))]
+      : [],
+    badges: Array.isArray(value.badges)
+      ? [...new Set(value.badges.filter((id): id is string => typeof id === 'string' && knownBadgeIds.has(id)))]
+      : [],
+    pendingBadges: Array.isArray(value.pendingBadges)
+      ? [...new Set(value.pendingBadges.filter((id): id is string => typeof id === 'string' && knownBadgeIds.has(id)))]
+      : [],
+  };
+}
+
+export function getEligibleBadgeIds(stats: UserStats): string[] {
+  const eligible: string[] = [];
+  if (stats.wordsLearned >= 1 || stats.gamesPlayed >= 1) eligible.push('first_step');
+  if (stats.streak >= 3) eligible.push('streak_3');
+  if (stats.streak >= 7) eligible.push('streak_7');
+  if (stats.wordsLearned >= 10) eligible.push('speller_10');
+  if (stats.wordsLearned >= 50) eligible.push('speller_50');
+  if (stats.highestScore >= 500) eligible.push('game_champ');
+  if (stats.perfectGames >= 1) eligible.push('perfect_100');
+  if (stats.level >= 5) eligible.push('level_5');
+  return eligible;
+}
+
 export function getUserStats(): UserStats {
-  if (typeof window === 'undefined') {
-    return {
-      exp: 0,
-      level: 1,
-      streak: 1,
-      lastLoginDate: getTodayString(),
-      wordsLearned: 0,
-      gamesPlayed: 0,
-      perfectGames: 0,
-      highestScore: 0,
-      badges: ['first_step'],
-    };
-  }
+  if (typeof window === 'undefined') return createDefaultStats(0);
 
   const raw = localStorage.getItem(STORAGE_KEY);
   if (!raw) {
-    const initStats: UserStats = {
-      exp: 50,
-      level: 1,
-      streak: 1,
-      lastLoginDate: getTodayString(),
-      wordsLearned: 0,
-      gamesPlayed: 0,
-      perfectGames: 0,
-      highestScore: 0,
-      badges: ['first_step'],
-    };
-    saveUserStats(initStats);
+    const initStats = createDefaultStats();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(initStats));
     return initStats;
   }
 
   try {
-    const stats: UserStats = JSON.parse(raw);
+    const parsed = JSON.parse(raw) as Partial<UserStats>;
+    const stats = normalizeStats(parsed);
     const today = getTodayString();
+    let shouldSave = JSON.stringify(stats) !== JSON.stringify(parsed);
 
     // Check streak
     if (stats.lastLoginDate !== today) {
@@ -105,46 +144,86 @@ export function getUserStats(): UserStats {
         stats.streak = 1;
       }
       stats.lastLoginDate = today;
-      saveUserStats(stats);
+      shouldSave = true;
     }
 
-    return stats;
+    const { level } = calculateLevel(stats.exp);
+    const hasNewBadge = getEligibleBadgeIds({ ...stats, level }).some((id) => !stats.badges.includes(id));
+    return shouldSave || stats.level !== level || hasNewBadge ? saveUserStats(stats) : stats;
   } catch (e) {
     console.error('Failed to parse user stats:', e);
-    return {
-      exp: 50,
-      level: 1,
-      streak: 1,
-      lastLoginDate: getTodayString(),
-      wordsLearned: 0,
-      gamesPlayed: 0,
-      perfectGames: 0,
-      highestScore: 0,
-      badges: ['first_step'],
-    };
+    const fallback = createDefaultStats();
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(fallback));
+    return fallback;
   }
 }
 
-export function saveUserStats(stats: UserStats): void {
+export function saveUserStats(stats: UserStats): UserStats {
+  const normalized = normalizeStats(stats);
+  Object.assign(stats, normalized);
   const { level } = calculateLevel(stats.exp);
   stats.level = level;
 
-  // Check badges
-  if (!stats.badges.includes('first_step')) stats.badges.push('first_step');
-  if (stats.streak >= 3 && !stats.badges.includes('streak_3')) stats.badges.push('streak_3');
-  if (stats.streak >= 7 && !stats.badges.includes('streak_7')) stats.badges.push('streak_7');
-  if (stats.wordsLearned >= 10 && !stats.badges.includes('speller_10')) stats.badges.push('speller_10');
-  if (stats.wordsLearned >= 50 && !stats.badges.includes('speller_50')) stats.badges.push('speller_50');
-  if (stats.highestScore >= 500 && !stats.badges.includes('game_champ')) stats.badges.push('game_champ');
-  if (stats.perfectGames >= 1 && !stats.badges.includes('perfect_100')) stats.badges.push('perfect_100');
-  if (stats.level >= 5 && !stats.badges.includes('level_5')) stats.badges.push('level_5');
+  const newBadgeIds = getEligibleBadgeIds(stats).filter((id) => !stats.badges.includes(id));
+  stats.badges.push(...newBadgeIds);
+  stats.pendingBadges = [...new Set([...stats.pendingBadges, ...newBadgeIds])];
 
   localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent(GAMIFICATION_UPDATED_EVENT, {
+      detail: { stats, newBadgeIds },
+    }));
+  }
+  return stats;
 }
 
 export function addExp(amount: number): UserStats {
   const stats = getUserStats();
-  stats.exp += amount;
-  saveUserStats(stats);
-  return stats;
+  stats.exp += Math.max(0, amount);
+  return saveUserStats(stats);
+}
+
+export function recordWordLearned(wordId: string): UserStats {
+  const stats = getUserStats();
+  if (!wordId || stats.learnedWordIds.includes(wordId)) return stats;
+  stats.learnedWordIds.push(wordId);
+  stats.wordsLearned += 1;
+  stats.exp += 2;
+  return saveUserStats(stats);
+}
+
+interface GameResult {
+  score: number;
+  correctCount: number;
+  totalQuestions: number;
+  exp: number;
+}
+
+export function recordGameResult(result: GameResult): UserStats {
+  const stats = getUserStats();
+  stats.gamesPlayed += 1;
+  stats.highestScore = Math.max(stats.highestScore, Math.max(0, result.score));
+  if (result.totalQuestions > 0 && result.correctCount === result.totalQuestions) {
+    stats.perfectGames += 1;
+  }
+  stats.exp += Math.max(0, result.exp);
+  return saveUserStats(stats);
+}
+
+export function consumePendingBadgeUnlocks(): Array<Omit<Badge, 'unlocked'>> {
+  if (typeof window === 'undefined') return [];
+  const raw = localStorage.getItem(STORAGE_KEY);
+  if (!raw) return [];
+  try {
+    const stats = normalizeStats(JSON.parse(raw) as Partial<UserStats>);
+    const pendingIds = [...stats.pendingBadges];
+    if (pendingIds.length === 0) return [];
+    stats.pendingBadges = [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stats));
+    return pendingIds
+      .map((id) => ALL_BADGES.find((badge) => badge.id === id))
+      .filter((badge): badge is Omit<Badge, 'unlocked'> => Boolean(badge));
+  } catch {
+    return [];
+  }
 }

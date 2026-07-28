@@ -19,6 +19,7 @@ import ListenQuiz from "@/pages/ListenQuiz";
 
 import { SwUpdateBanner } from "@/components/SwUpdateBanner";
 import { HeroProfileGate } from "@/components/student/HeroProfileGate";
+import { BadgeUnlockNotifier } from "@/components/gamification/BadgeUnlockNotifier";
 
 const queryClient = new QueryClient();
 
@@ -62,6 +63,7 @@ function App() {
         <WouterRouter hook={useHashLocation}>
           <Router />
         </WouterRouter>
+        <BadgeUnlockNotifier />
         <Toaster />
         <SwUpdateBanner />
       </TooltipProvider>

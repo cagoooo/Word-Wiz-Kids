@@ -14,7 +14,7 @@ import { startBGM, stopBGM, sfxCorrect, sfxWrong, sfxCountdownTick, sfxCountdown
 import { useSoundSettings } from "@/hooks/useSoundSettings";
 import { UserExpBar } from "@/components/gamification/UserExpBar";
 import { AudioButton } from "@/components/ui/AudioButton";
-import { addExp, getUserStats, saveUserStats } from "@/lib/gamification";
+import { recordGameResult } from "@/lib/gamification";
 import { recordMistake } from "@/lib/mistakes";
 
 type GamePhase = "select" | "countdown" | "question" | "results";
@@ -162,6 +162,7 @@ export default function Game() {
   const [timerWidth, setTimerWidth] = useState("100%");
   const timerStartRef = useRef<number>(0);
   const timerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const gamificationRecordedRef = useRef(false);
 
   // Auto-scroll refs for the 3-step select screen
   const difficultyRef = useRef<HTMLDivElement>(null);
@@ -252,6 +253,17 @@ export default function Game() {
   useEffect(() => {
     if (state.phase !== "results" || state.questions.length === 0) return undefined;
     sfxLevelComplete();
+    if (!gamificationRecordedRef.current) {
+      const exp = state.correctCount * 5
+        + (state.correctCount === state.questions.length ? 20 : 0);
+      recordGameResult({
+        score: state.score,
+        correctCount: state.correctCount,
+        totalQuestions: state.questions.length,
+        exp,
+      });
+      gamificationRecordedRef.current = true;
+    }
     const student = loadStudent();
     if (!student?.nickname) return undefined;
     const studentId = getOrCreateStudentId();
@@ -483,7 +495,10 @@ export default function Game() {
         ref={startBtnRef}
         data-testid="start-game"
         disabled={!canStart}
-        onClick={() => dispatch({ type: "START_COUNTDOWN" })}
+        onClick={() => {
+          gamificationRecordedRef.current = false;
+          dispatch({ type: "START_COUNTDOWN" });
+        }}
         className="w-full py-5 sm:py-7 bg-green-500 hover:bg-green-600 active:scale-95 active:translate-y-1 text-white rounded-[2rem] sm:rounded-[3rem] text-2xl sm:text-4xl font-black shadow-[0_8px_0_rgba(21,128,61,1)] sm:shadow-[0_10px_0_rgba(21,128,61,1)] transition-all flex items-center justify-center gap-4 sm:gap-6 group hover:-translate-y-1 hover:shadow-[0_12px_0_rgba(21,128,61,1)] disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
       >
         {loading ? (
@@ -780,14 +795,20 @@ export default function Game() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             data-testid="btn-replay"
-            onClick={() => dispatch({ type: "RESTART" })}
+            onClick={() => {
+              gamificationRecordedRef.current = false;
+              dispatch({ type: "RESTART" });
+            }}
             className="flex-1 py-5 bg-primary hover:bg-primary/90 text-white rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(147,51,234,1)] active:translate-y-2 active:shadow-none transition-all"
           >
             🔄 再玩一次
           </button>
           <button
             data-testid="btn-change-topic"
-            onClick={() => dispatch({ type: "CHANGE_TOPIC" })}
+            onClick={() => {
+              gamificationRecordedRef.current = false;
+              dispatch({ type: "CHANGE_TOPIC" });
+            }}
             className="flex-1 py-5 bg-card border-4 border-border hover:bg-muted text-foreground rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-none transition-all"
           >
             🎯 換個主題

@@ -1,11 +1,18 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Award, Flame, Zap } from 'lucide-react';
-import { calculateLevel, getUserStats } from '@/lib/gamification';
+import { calculateLevel, GAMIFICATION_UPDATED_EVENT, getUserStats } from '@/lib/gamification';
 import { BadgeGridModal } from './BadgeGrid';
 
 export const UserExpBar: React.FC = () => {
   const [showBadges, setShowBadges] = useState(false);
-  const stats = getUserStats();
+  const [stats, setStats] = useState(getUserStats);
+
+  useEffect(() => {
+    const refreshStats = () => setStats(getUserStats());
+    window.addEventListener(GAMIFICATION_UPDATED_EVENT, refreshStats);
+    return () => window.removeEventListener(GAMIFICATION_UPDATED_EVENT, refreshStats);
+  }, []);
+
   const { level, currentExp, maxExp } = calculateLevel(stats.exp);
   const percent = Math.min(100, Math.round((currentExp / maxExp) * 100));
 

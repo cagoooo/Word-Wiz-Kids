@@ -11,7 +11,7 @@ import { useWordLibrary } from "@/hooks/useWordLibrary";
 import { Word } from "@/data/words";
 import { UserExpBar } from "@/components/gamification/UserExpBar";
 import { sfxCorrect, sfxWrong, sfxLevelComplete } from "@/lib/soundEngine";
-import { addExp } from "@/lib/gamification";
+import { recordGameResult } from "@/lib/gamification";
 import { recordMistake } from "@/lib/mistakes";
 import { getStudentRank, submitScore } from "@/lib/firestore";
 import { loadStudent } from "@/hooks/useStudent";
@@ -113,7 +113,13 @@ export default function ListenQuiz() {
       if (currentIdx + 1 >= questions.length) {
         sfxLevelComplete();
         const exp = correctCount * 5 + (isCorrect ? 5 : 0);
-        addExp(exp);
+        const finalCorrectCount = correctCount + (isCorrect ? 1 : 0);
+        recordGameResult({
+          score: finalCorrectCount * 100,
+          correctCount: finalCorrectCount,
+          totalQuestions: questions.length,
+          exp,
+        });
         setPhase("results");
       } else {
         setCurrentIdx((i) => i + 1);
