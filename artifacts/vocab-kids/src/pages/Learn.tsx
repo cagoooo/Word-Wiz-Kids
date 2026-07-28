@@ -245,22 +245,21 @@ export default function Learn() {
 
     const word = reviewWords[reviewIndex];
     const direction = reviewDirections[reviewIndex] ?? 'zh_to_en';
-    const progress = Math.round((reviewIndex / reviewWords.length) * 100);
+    const progress = Math.round(((reviewIndex + 1) / reviewWords.length) * 100);
 
     // What the user sees as the prompt vs. the revealed answer
     const promptText    = direction === 'zh_to_en' ? word.chinese  : word.english;
     const promptHint    = direction === 'zh_to_en' ? '這個單字的英文是什麼呢？' : '這個單字的中文是什麼呢？';
-    const answerHeading = direction === 'zh_to_en' ? word.english  : word.chinese;
     const directionBadge = direction === 'zh_to_en'
       ? { label: '中 → 英', bg: 'bg-rose-100 text-rose-700' }
       : { label: '英 → 中', bg: 'bg-blue-100 text-blue-700' };
 
     return (
-      <div className="flex-1 flex flex-col items-center w-full max-w-md mx-auto mt-4">
-        <div className="w-full mb-8 space-y-2 px-4">
+      <div className="mx-auto mt-4 flex w-full max-w-xl flex-1 flex-col items-center">
+        <div className="mb-5 w-full space-y-2 px-1 sm:px-3">
           <div className="flex justify-between text-sm font-bold text-muted-foreground">
             <span>複習進度</span>
-            <span>{progress}%</span>
+            <span>第 {reviewIndex + 1} / {reviewWords.length} 題 · {progress}%</span>
           </div>
           <div className="w-full h-3 bg-muted rounded-full overflow-hidden">
             <motion.div
@@ -284,10 +283,10 @@ export default function Learn() {
             >
               {reviewState === 'question' ? (
                 <div
-                  className="w-full aspect-[3/4] bg-card rounded-[2rem] shadow-xl border-2 border-border flex flex-col items-center justify-center p-8 text-center relative overflow-hidden"
+                  className="relative flex min-h-[28rem] w-full flex-col items-center justify-center overflow-hidden rounded-[2rem] border-2 border-border bg-card p-6 text-center shadow-xl sm:min-h-[30rem] sm:p-9"
                   data-testid="review-question"
                 >
-                  <div className="absolute top-6 left-6 flex items-center gap-2">
+                  <div className="absolute inset-x-5 top-5 flex flex-wrap items-center gap-2 sm:inset-x-8 sm:top-8">
                     <span className="px-4 py-1.5 bg-muted text-muted-foreground rounded-full font-bold text-sm tracking-widest">
                       {word.category}
                     </span>
@@ -295,10 +294,10 @@ export default function Learn() {
                       {directionBadge.label}
                     </span>
                   </div>
-                  <h2 className="text-6xl font-black text-foreground tracking-wider mb-8">
+                  <h2 className="max-w-full break-words text-4xl font-black tracking-wider text-foreground sm:text-6xl">
                     {promptText}
                   </h2>
-                  <p className="text-lg text-muted-foreground font-medium mb-12">
+                  <p className="mb-16 mt-5 text-base font-medium text-muted-foreground sm:mb-20 sm:text-lg">
                     {promptHint}
                   </p>
                   <Button
@@ -308,7 +307,7 @@ export default function Learn() {
                       setReviewState('answer');
                       speakWord(word.english);
                     }}
-                    className="rounded-full px-12 py-8 text-2xl font-bold absolute bottom-12 w-[80%] shadow-lg"
+                    className="absolute bottom-6 h-auto w-[calc(100%-3rem)] rounded-2xl px-8 py-5 text-xl font-black shadow-lg sm:bottom-9 sm:w-[80%] sm:text-2xl"
                     data-testid="button-reveal"
                   >
                     看答案
@@ -316,47 +315,68 @@ export default function Learn() {
                 </div>
               ) : (
                 <div
-                  className="w-full aspect-[3/4] bg-card rounded-[2rem] shadow-xl border-2 border-border flex flex-col items-center justify-center p-8 relative"
+                  className="relative flex min-h-[30rem] w-full flex-col rounded-[2rem] border-2 border-border bg-card p-5 shadow-xl sm:p-8"
                   data-testid="review-answer"
                 >
-                  <div className="flex-1 flex flex-col items-center justify-center gap-6 w-full text-center">
+                  <div className="mb-4 flex w-full flex-wrap items-center justify-between gap-2 border-b border-border pb-4">
+                    <span className="rounded-full bg-muted px-3 py-1.5 text-xs font-black tracking-wider text-muted-foreground sm:px-4 sm:text-sm">
+                      {word.category}
+                    </span>
+                    <span className={`rounded-full px-3 py-1.5 text-xs font-black sm:text-sm ${directionBadge.bg}`}>
+                      {directionBadge.label}
+                    </span>
+                  </div>
+
+                  <div className="flex w-full flex-1 flex-col items-center justify-center gap-4 px-1 text-center sm:gap-5 sm:px-4">
                     {/* Always show both Chinese and English in the answer */}
-                    <div className="text-4xl font-black text-muted-foreground">{word.chinese}</div>
-                    <div className="flex flex-col items-center gap-3">
+                    <div className="text-3xl font-black tracking-wide text-foreground sm:text-4xl">{word.chinese}</div>
+                    <div className="flex max-w-full flex-col items-center gap-2">
                       <PhoneticHighlight word={word} />
-                      <p className="text-2xl text-muted-foreground font-mono tracking-wider">{word.phonetic}</p>
+                      {word.phonetic && <p className="font-mono text-lg tracking-wider text-muted-foreground sm:text-xl">{word.phonetic}</p>}
                     </div>
-                    <div className="text-3xl font-black text-foreground">{answerHeading}</div>
                     <Button
                       variant="ghost"
-                      size="icon"
-                      className="w-14 h-14 rounded-full bg-blue-50 hover:bg-blue-100 text-blue-500"
+                      className="h-11 rounded-full bg-blue-50 px-5 font-bold text-blue-600 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-950/60"
                       onClick={() => speakWord(word.english)}
                       data-testid="button-speak-review"
                     >
-                      <Volume2 className="w-8 h-8" />
+                      <Volume2 className="mr-2 h-5 w-5" />
+                      聽發音
                     </Button>
+
+                    {word.example && (
+                      <div className="mt-1 w-full rounded-2xl bg-muted/60 px-4 py-3 text-left sm:px-5">
+                        <p className="text-sm font-bold leading-relaxed text-foreground sm:text-base">{word.example}</p>
+                        {word.exampleChinese && <p className="mt-1 text-xs leading-relaxed text-muted-foreground sm:text-sm">{word.exampleChinese}</p>}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4 w-full absolute bottom-8 px-8">
+                  <div className="mt-5 grid w-full grid-cols-1 gap-3 border-t border-border pt-5 sm:grid-cols-2 sm:gap-4">
                     <Button
                       variant="outline"
                       size="lg"
                       onClick={() => handleNextReview(false)}
-                      className="rounded-full py-8 text-lg font-bold border-rose-200 text-rose-500 hover:bg-rose-50 shadow-sm"
+                      className="h-auto min-h-16 w-full whitespace-normal rounded-2xl border-rose-200 px-4 py-3 text-rose-600 shadow-sm hover:bg-rose-50 dark:border-rose-900/60 dark:hover:bg-rose-950/30"
                       data-testid="button-unknown"
                     >
-                      <X className="w-6 h-6 mr-2" />
-                      再看一次
+                      <X className="mr-3 h-6 w-6 shrink-0" />
+                      <span className="flex flex-col items-start text-left leading-tight">
+                        <span className="text-base font-black">再練一次</span>
+                        <span className="mt-1 text-[11px] font-medium text-rose-400">之後再複習這個單字</span>
+                      </span>
                     </Button>
                     <Button
                       size="lg"
                       onClick={() => handleNextReview(true)}
-                      className="rounded-full py-8 text-lg font-bold bg-emerald-500 hover:bg-emerald-600 text-white shadow-md"
+                      className="h-auto min-h-16 w-full whitespace-normal rounded-2xl bg-emerald-500 px-4 py-3 text-white shadow-md hover:bg-emerald-600"
                       data-testid="button-known"
                     >
-                      <Check className="w-6 h-6 mr-2" />
-                      知道了
+                      <Check className="mr-3 h-6 w-6 shrink-0" />
+                      <span className="flex flex-col items-start text-left leading-tight">
+                        <span className="text-base font-black">我記住了</span>
+                        <span className="mt-1 text-[11px] font-medium text-emerald-100">繼續前往下一個單字</span>
+                      </span>
                     </Button>
                   </div>
                 </div>
