@@ -88,30 +88,29 @@ export default function Home() {
       </div>
 
       {/* Hero Section */}
-      <section className="relative h-[80vh] w-full flex items-center justify-center overflow-hidden">
+      <section className="relative min-h-[calc(100dvh-5rem)] h-auto sm:h-[80vh] w-full flex items-center justify-center overflow-hidden py-4 sm:py-0 pb-[calc(1rem+env(safe-area-inset-bottom))]">
         <HeroScene />
 
-        <div className="z-10 text-center px-4 w-full max-w-5xl mx-auto pointer-events-none mt-10">
+        <div className="z-10 text-center px-3 sm:px-4 w-full max-w-5xl mx-auto pointer-events-none mt-2 sm:mt-10">
           <motion.div
             initial={{ opacity: 0, y: 30 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, ease: 'easeOut' }}
-            className="backdrop-blur-md bg-black/25 p-6 sm:p-10 rounded-3xl border border-white/10 shadow-2xl pointer-events-auto"
+            className="backdrop-blur-md bg-black/25 p-4 sm:p-10 rounded-3xl border border-white/10 shadow-2xl pointer-events-auto"
           >
-            <h1 className="text-4xl sm:text-6xl md:text-7xl font-bold text-white mb-4 drop-shadow-lg flex flex-col gap-1">
+            <h1 className="text-3xl sm:text-6xl md:text-7xl font-bold text-white mb-3 sm:mb-4 drop-shadow-lg flex flex-col gap-1">
               <span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-300 via-pink-400 to-purple-400">
                 神奇單字
               </span>
               <span>等你來探索！</span>
             </h1>
-            <p className="text-base sm:text-xl text-white/85 mb-8 max-w-xl mx-auto drop-shadow-md">
+            <p className="text-sm sm:text-xl text-white/85 mb-5 sm:mb-8 max-w-xl mx-auto drop-shadow-md">
               踏入發光的魔法世界，英文字母在這裡活了起來，每個單字後面都藏著精彩冒險！
             </p>
 
             {/* ── 功能卡片 Grid ── */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
               {NAV_CARDS.map((card, i) => {
-                const Icon = card.icon;
                 return (
                   <motion.div
                     key={card.href}
@@ -125,15 +124,15 @@ export default function Home() {
                       href={card.href}
                       data-testid={card.testId}
                       className={[
-                        'group relative flex flex-col items-center justify-center gap-2',
-                        'rounded-2xl sm:rounded-3xl border p-4 sm:p-5',
+                        'group relative flex flex-col items-center justify-center gap-1.5 sm:gap-2',
+                        'rounded-2xl sm:rounded-3xl border p-3 sm:p-5',
                         'bg-gradient-to-br', card.gradient,
                         'shadow-xl', card.glow, card.border,
                         'transition-all duration-200',
                         'hover:scale-[1.06] hover:brightness-110 hover:-translate-y-1',
                         'active:scale-95',
                         'overflow-hidden',
-                        card.featured ? 'min-h-[110px] sm:min-h-[130px]' : 'min-h-[100px] sm:min-h-[120px]',
+                        card.featured ? 'min-h-[84px] sm:min-h-[130px]' : 'min-h-[100px] sm:min-h-[120px]',
                       ].join(' ')}
                     >
                       {/* Shimmer overlay on hover */}
@@ -147,11 +146,8 @@ export default function Home() {
                         {card.badge}
                       </span>
 
-                      {/* Icon */}
-                      <Icon className="w-5 h-5 sm:w-6 sm:h-6 text-white/90 drop-shadow-sm" />
-
                       {/* Label */}
-                      <span className="text-white font-black text-sm sm:text-base leading-tight tracking-wide drop-shadow-md text-center">
+                      <span className="text-white font-black text-base leading-tight tracking-wide drop-shadow-md text-center">
                         {card.label}
                       </span>
 
@@ -173,7 +169,7 @@ export default function Home() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ delay: 0.6 }}
-              className="mt-5 flex items-center justify-center gap-3"
+              className="mt-5 hidden sm:flex items-center justify-center gap-3"
             >
               <Link
                 href="/learn"

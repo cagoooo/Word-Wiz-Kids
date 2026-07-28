@@ -53,11 +53,11 @@ export function AnswerButton({
       onMouseEnter={handleMouseEnter}
       data-testid={testId}
       className={[
-        'game-answer-button relative flex flex-col md:flex-row items-center justify-center md:justify-start',
-        'gap-1 md:gap-6',
-        'p-2 sm:p-3 md:p-8',
-        'rounded-2xl sm:rounded-3xl w-full h-full',
-        'min-h-[60px] sm:min-h-[80px] md:min-h-[120px]',
+        'game-answer-button relative flex flex-row items-center justify-start',
+        'gap-2.5 sm:gap-3 md:gap-5',
+        'p-2.5 sm:p-3 md:px-6 md:py-4',
+        'rounded-xl sm:rounded-2xl md:rounded-3xl w-full h-full',
+        'min-h-[56px] sm:min-h-[72px] md:min-h-[96px]',
         'shadow-[0_6px_0_rgba(0,0,0,0.2)] transition-all duration-200',
         config.bg, config.text, stateClasses,
         disabled
@@ -73,9 +73,9 @@ export function AnswerButton({
       )}
 
       <div className="game-answer-icon shrink-0">
-        <Icon className="w-4 h-4 sm:w-6 sm:h-6 md:w-14 md:h-14 fill-current opacity-90 drop-shadow-sm" />
+        <Icon className="w-5 h-5 sm:w-7 sm:h-7 md:w-10 md:h-10 fill-current opacity-90 drop-shadow-sm" />
       </div>
-      <span className="game-answer-label text-sm sm:text-base md:text-4xl font-black tracking-wide text-center md:text-left drop-shadow-md leading-tight break-words max-w-full">
+      <span className="game-answer-label min-w-0 flex-1 text-lg sm:text-xl md:text-3xl font-black tracking-wide text-left drop-shadow-md leading-tight break-words max-w-full">
         {label}
       </span>
     </motion.button>
