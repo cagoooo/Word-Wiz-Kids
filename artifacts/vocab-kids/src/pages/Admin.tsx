@@ -13,7 +13,7 @@ import { useLocation } from 'wouter';
 import {
   Shield, KeyRound, ArrowRight,
   BarChart3, Users, Star, Target, Gamepad2, RefreshCw, AlertCircle,
-  Sparkles, BookOpen, Settings, Save, Check,
+  Sparkles, BookOpen, Settings, Save, Check, Loader2, ExternalLink, WifiOff,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 import { getAllStudentProgress, type StudentProgress } from '@/lib/firestore';
@@ -23,7 +23,14 @@ import { AVATAR_COLORS, AVATAR_INITIALS } from '@/components/student/NicknameSet
 import { ImageUploader } from '@/components/admin/ImageUploader';
 import { WordExtractResult } from '@/components/admin/WordExtractResult';
 import { WordLibrary } from '@/components/admin/WordLibrary';
-import { analyzeImageForWords, type ExtractedWord } from '@/lib/geminiClient';
+import {
+  analyzeImageForWords,
+  validateGeminiApiKey,
+  type ExtractedWord,
+  type GeminiKeyCheck,
+} from '@/lib/geminiClient';
+import { useWordLibrary } from '@/hooks/useWordLibrary';
+import { ARENA_HOST_SESSION_KEY, createArenaRoom, getArenaErrorMessage } from '@/lib/realtimeArena';
 
 const PIN_STORAGE_KEY = 'vocab-admin-pin';
 const DEFAULT_PIN = '0220';
@@ -260,13 +267,26 @@ function SummaryCard({ icon, label, value }: { icon: React.ReactNode; label: str
 
 // ── Gemini Vision tab ─────────────────────────────────────────────────────────
 
-function GeminiVisionTab() {
+function GeminiVisionTab({ onOpenSettings }: { onOpenSettings: () => void }) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [extractedWords, setExtractedWords] = useState<ExtractedWord[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
+  const [keyCheck, setKeyCheck] = useState<GeminiKeyCheck | null>(null);
+  const [checkingKey, setCheckingKey] = useState(true);
   const resultsRef = useRef<HTMLDivElement>(null);
+
+  async function checkKey() {
+    setCheckingKey(true);
+    setKeyCheck(null);
+    setKeyCheck(await validateGeminiApiKey());
+    setCheckingKey(false);
+  }
+
+  useEffect(() => {
+    void checkKey();
+  }, []);
 
   async function handleImage(base64: string, mimeType: string, preview: string) {
     setPreviewUrl(preview);
@@ -315,6 +335,46 @@ function GeminiVisionTab() {
         </div>
       </div>
 
+      <div
+        className={`rounded-2xl border p-4 text-sm ${
+          checkingKey
+            ? 'border-blue-200 bg-blue-50 text-blue-800'
+            : keyCheck?.status === 'valid'
+              ? 'border-green-200 bg-green-50 text-green-800'
+              : 'border-amber-200 bg-amber-50 text-amber-900'
+        }`}
+        data-testid="gemini-key-status"
+      >
+        <div className="flex items-start gap-3">
+          {checkingKey
+            ? <Loader2 className="mt-0.5 h-5 w-5 shrink-0 animate-spin" />
+            : keyCheck?.status === 'valid'
+              ? <Check className="mt-0.5 h-5 w-5 shrink-0" />
+              : <KeyRound className="mt-0.5 h-5 w-5 shrink-0" />}
+          <div className="min-w-0 flex-1">
+            <p className="font-black">
+              {checkingKey ? '正在自動檢查 Gemini API Key…' : keyCheck?.status === 'valid' ? 'Gemini 已可使用' : '需要設定 Gemini API Key'}
+            </p>
+            <p className="mt-1 font-medium opacity-90">
+              {checkingKey ? '正在確認金鑰與視覺模型權限，請稍候。' : keyCheck?.message}
+            </p>
+            {!checkingKey && keyCheck?.status !== 'valid' && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={onOpenSettings} className="rounded-xl bg-amber-600 px-3 py-2 font-bold text-white">
+                  前往後臺設定金鑰
+                </button>
+                <a href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer" className="flex items-center gap-1 rounded-xl border border-amber-300 bg-white px-3 py-2 font-bold text-amber-800">
+                  建立 API Key <ExternalLink className="h-3.5 w-3.5" />
+                </a>
+                <button type="button" onClick={() => void checkKey()} className="rounded-xl border border-amber-300 px-3 py-2 font-bold">
+                  重新檢查
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
       {successMsg && (
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
           className="p-4 bg-green-50 border border-green-200 rounded-2xl text-green-800 font-bold text-sm">
@@ -335,12 +395,105 @@ function GeminiVisionTab() {
         </div>
       )}
 
-      {!extractedWords ? (
+      {!checkingKey && keyCheck?.status === 'valid' && !extractedWords ? (
         <ImageUploader onImage={handleImage} loading={loading} />
-      ) : (
+      ) : extractedWords ? (
         <div ref={resultsRef}>
           <WordExtractResult words={extractedWords} onSaved={handleSaved} onReset={handleReset} />
         </div>
+      ) : (
+        <div className="rounded-3xl border-2 border-dashed border-border bg-muted/30 p-10 text-center text-sm font-bold text-muted-foreground">
+          完成 API Key 驗證後，即可上傳圖片進行單字辨識。
+        </div>
+      )}
+
+      <p className="text-center text-xs text-muted-foreground">圖片辨識會使用您設定的 Gemini API 配額，請只上傳教學所需圖片。</p>
+    </div>
+  );
+}
+
+// ── Classroom arena admin tab ────────────────────────────────────────────────
+
+function ArenaAdminTab() {
+  const [, navigate] = useLocation();
+  const { words, categories, loading, error: wordError } = useWordLibrary();
+  const [category, setCategory] = useState('全部');
+  const [questionCount, setQuestionCount] = useState(5);
+  const [creating, setCreating] = useState(false);
+  const [error, setError] = useState('');
+  const [activePin, setActivePin] = useState(() => sessionStorage.getItem(ARENA_HOST_SESSION_KEY));
+  const categoryWords = category === '全部' ? words : words.filter((word) => word.category === category);
+
+  async function handleCreate() {
+    setCreating(true);
+    setError('');
+    try {
+      const pin = await createArenaRoom(category, words, questionCount, '老師');
+      sessionStorage.setItem(ARENA_HOST_SESSION_KEY, pin);
+      setActivePin(pin);
+    } catch (createError) {
+      setError(getArenaErrorMessage(createError, '建立對戰房間失敗，請稍後再試。'));
+    } finally {
+      setCreating(false);
+    }
+  }
+
+  if (activePin) {
+    return (
+      <div className="mx-auto max-w-2xl rounded-3xl border-2 border-primary/20 bg-card p-6 text-center shadow-lg sm:p-8">
+        <Gamepad2 className="mx-auto mb-3 h-12 w-12 text-primary" />
+        <h2 className="text-2xl font-black text-foreground">對戰 PIN 已建立</h2>
+        <p className="mt-2 text-sm font-medium text-muted-foreground">請開啟老師主控畫面，讓學生輸入下方 PIN 加入。</p>
+        <div className="my-6 inline-block rounded-3xl bg-gradient-to-r from-purple-600 to-indigo-600 px-8 py-5 font-mono text-5xl font-black tracking-[0.18em] text-white shadow-xl" data-testid="admin-arena-pin">
+          {activePin}
+        </div>
+        <button type="button" onClick={() => navigate('/arena/host')} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-4 text-lg font-black text-white shadow-lg">
+          開啟老師主控畫面 <ArrowRight className="h-5 w-5" />
+        </button>
+        <button type="button" onClick={() => { sessionStorage.removeItem(ARENA_HOST_SESSION_KEY); setActivePin(null); }} className="mt-3 rounded-xl px-4 py-2 text-sm font-bold text-muted-foreground hover:bg-muted">
+          改建另一場對戰
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl space-y-6 rounded-3xl border border-border bg-card p-6 shadow-sm sm:p-8">
+      <div className="text-center">
+        <Gamepad2 className="mx-auto mb-3 h-12 w-12 text-primary" />
+        <h2 className="text-2xl font-black text-foreground">建立全班對戰</h2>
+        <p className="mt-2 text-sm text-muted-foreground">在管理後臺選擇題庫並產生 4 位數 PIN，再開啟老師主控畫面。</p>
+      </div>
+
+      {loading ? (
+        <div className="flex items-center justify-center gap-2 py-10 font-bold text-muted-foreground"><Loader2 className="h-5 w-5 animate-spin" /> 載入單字庫…</div>
+      ) : wordError ? (
+        <div className="rounded-2xl border border-destructive/20 bg-destructive/5 p-5 text-center text-destructive"><WifiOff className="mx-auto mb-2 h-7 w-7" /><p className="font-bold">無法讀取單字庫，請檢查 Firebase 連線。</p></div>
+      ) : (
+        <>
+          <div>
+            <label className="mb-2 block text-sm font-black text-foreground">1. 選擇對戰主題</label>
+            <div className="flex flex-wrap gap-2">
+              {categories.map((item) => (
+                <button type="button" key={item} onClick={() => setCategory(item)} className={`rounded-xl px-4 py-2 text-sm font-bold ${category === item ? 'bg-primary text-white shadow' : 'border border-border bg-muted text-muted-foreground'}`}>{item}</button>
+              ))}
+            </div>
+            <p className="mt-2 text-xs font-bold text-muted-foreground">可用單字：{categoryWords.length} 個</p>
+          </div>
+          <div>
+            <label className="mb-2 block text-sm font-black text-foreground">2. 選擇題數</label>
+            <div className="grid grid-cols-3 gap-2">
+              {[5, 10, 15].map((count) => (
+                <button type="button" key={count} disabled={categoryWords.length < count} onClick={() => setQuestionCount(count)} className={`rounded-xl py-3 font-black disabled:opacity-40 ${questionCount === count ? 'bg-emerald-500 text-white shadow' : 'border border-border bg-muted text-muted-foreground'}`}>{count} 題</button>
+              ))}
+            </div>
+          </div>
+          {categoryWords.length < 4 && <p className="rounded-xl bg-amber-50 p-3 text-center text-sm font-bold text-amber-800">至少需要 4 個單字才能建立四選一對戰。</p>}
+          {error && <p className="rounded-xl bg-destructive/10 p-3 text-center text-sm font-bold text-destructive">{error}</p>}
+          <button type="button" onClick={() => void handleCreate()} disabled={creating || categoryWords.length < 4} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 py-4 text-lg font-black text-white shadow-lg disabled:opacity-40" data-testid="admin-create-arena">
+            {creating ? <><Loader2 className="h-5 w-5 animate-spin" /> 建立房間中…</> : <><Sparkles className="h-5 w-5" /> 產生對戰 PIN</>}
+          </button>
+        </>
       )}
     </div>
   );
@@ -348,12 +501,13 @@ function GeminiVisionTab() {
 
 // ── Tabs layout ───────────────────────────────────────────────────────────────
 
-type Tab = 'dashboard' | 'vision' | 'library' | 'settings';
+type Tab = 'dashboard' | 'vision' | 'library' | 'arena' | 'settings';
 
 const TABS: { id: Tab; label: string; icon: React.ReactNode }[] = [
   { id: 'dashboard', label: '儀表板',  icon: <BarChart3 className="w-4 h-4" /> },
   { id: 'vision',    label: '單字辨識', icon: <Sparkles className="w-4 h-4" /> },
   { id: 'library',   label: '單字庫',  icon: <BookOpen className="w-4 h-4" /> },
+  { id: 'arena',     label: '全班對戰', icon: <Gamepad2 className="w-4 h-4" /> },
   { id: 'settings',  label: '設定',    icon: <Settings className="w-4 h-4" /> },
 ];
 
@@ -365,6 +519,9 @@ function SettingsTab() {
   const [confirmPin, setConfirmPin] = useState('');
   const [activeField, setActiveField] = useState<'new' | 'confirm'>('new');
   const [err, setErr] = useState('');
+  const [geminiKeyInput, setGeminiKeyInput] = useState(() => localStorage.getItem('vocab-gemini-key') || '');
+  const [geminiSaveStatus, setGeminiSaveStatus] = useState<GeminiKeyCheck | null>(null);
+  const [checkingGemini, setCheckingGemini] = useState(false);
 
   const appendDigit = (n: number) => {
     if (activeField === 'new' && newPin.length < 4) setNewPin(p => p + n);
@@ -467,28 +624,37 @@ function SettingsTab() {
           <input
             type="password"
             placeholder="貼上您的 Gemini API Key (AIzaSy...)"
-            defaultValue={localStorage.getItem('vocab-gemini-key') || ''}
-            id="gemini-key-input"
+            value={geminiKeyInput}
+            onChange={(event) => { setGeminiKeyInput(event.target.value); setGeminiSaveStatus(null); }}
             className="flex-1 px-4 py-2.5 rounded-xl border border-border bg-background text-sm font-mono focus:outline-none focus:ring-2 focus:ring-primary"
+            data-testid="gemini-key-input"
           />
           <button
             type="button"
-            onClick={() => {
-              const val = (document.getElementById('gemini-key-input') as HTMLInputElement)?.value.trim();
+            disabled={checkingGemini}
+            onClick={async () => {
+              const val = geminiKeyInput.trim();
               if (val) {
                 localStorage.setItem('vocab-gemini-key', val);
-                alert('Gemini API Key 已儲存！');
               } else {
                 localStorage.removeItem('vocab-gemini-key');
-                alert('已清除自訂 Gemini API Key！');
               }
+              setCheckingGemini(true);
+              setGeminiSaveStatus(await validateGeminiApiKey());
+              setCheckingGemini(false);
             }}
-            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors shrink-0 flex items-center gap-1.5"
+            className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs transition-colors shrink-0 flex items-center gap-1.5 disabled:opacity-60"
+            data-testid="gemini-key-save"
           >
-            <Save className="w-4 h-4" />
-            儲存金鑰
+            {checkingGemini ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+            {checkingGemini ? '驗證中' : '儲存並驗證'}
           </button>
         </div>
+        {geminiSaveStatus && (
+          <p className={`rounded-xl border p-3 text-xs font-bold ${geminiSaveStatus.status === 'valid' ? 'border-green-200 bg-green-50 text-green-800' : 'border-amber-200 bg-amber-50 text-amber-900'}`} data-testid="gemini-settings-status">
+            {geminiSaveStatus.message}
+          </p>
+        )}
       </div>
     </div>
   );
@@ -511,12 +677,12 @@ function AdminDashboard({ onLock }: { onLock: () => void }) {
       </div>
 
       {/* Tab bar */}
-      <div className="flex gap-1 bg-muted p-1 rounded-2xl mb-6">
+      <div className="flex gap-1 overflow-x-auto bg-muted p-1 rounded-2xl mb-6">
         {TABS.map((t) => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl font-bold text-sm transition-all ${tab === t.id ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
+            className={`min-w-[7.5rem] flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl font-bold text-sm transition-all ${tab === t.id ? 'bg-card shadow text-foreground' : 'text-muted-foreground hover:text-foreground'}`}
             data-testid={`tab-${t.id}`}
           >
             {t.icon}
@@ -535,8 +701,9 @@ function AdminDashboard({ onLock }: { onLock: () => void }) {
           transition={{ duration: 0.15 }}
         >
           {tab === 'dashboard' && <DashboardTab />}
-          {tab === 'vision'    && <GeminiVisionTab />}
+          {tab === 'vision'    && <GeminiVisionTab onOpenSettings={() => setTab('settings')} />}
           {tab === 'library'   && <WordLibrary />}
+          {tab === 'arena'     && <ArenaAdminTab />}
           {tab === 'settings'  && <SettingsTab />}
         </motion.div>
       </AnimatePresence>

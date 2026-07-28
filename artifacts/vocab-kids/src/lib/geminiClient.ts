@@ -10,12 +10,71 @@ export interface ExtractedWord {
   category: string;
 }
 
+export const GEMINI_VISION_MODEL = 'gemini-2.5-flash-lite';
+
+export type GeminiKeyCheck =
+  | { status: 'missing'; message: string }
+  | { status: 'valid'; message: string }
+  | { status: 'invalid'; message: string };
+
 export function getGeminiApiKey(): string {
   const envKey = import.meta.env.VITE_GEMINI_API_KEY as string | undefined;
   const localKey = localStorage.getItem('vocab-gemini-key');
-  if (envKey && envKey.trim().length > 0) return envKey.trim();
   if (localKey && localKey.trim().length > 0) return localKey.trim();
+  if (envKey && envKey.trim().length > 0) return envKey.trim();
   return '';
+}
+
+/**
+ * Verify that the configured key can access the exact vision model used by the
+ * app. The model metadata endpoint does not generate content or spend output
+ * tokens, so it is safe to run automatically when the admin opens the tab.
+ */
+export async function validateGeminiApiKey(): Promise<GeminiKeyCheck> {
+  const apiKey = getGeminiApiKey();
+  if (!apiKey) {
+    return {
+      status: 'missing',
+      message: '尚未設定 Gemini API Key，請先建立並儲存金鑰後再使用圖片辨識。',
+    };
+  }
+
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 10_000);
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}?key=${encodeURIComponent(apiKey)}`,
+      { signal: controller.signal, cache: 'no-store' },
+    );
+
+    if (response.ok) {
+      return {
+        status: 'valid',
+        message: `API Key 驗證成功，可使用 ${GEMINI_VISION_MODEL} 視覺辨識。`,
+      };
+    }
+
+    const body = await response.json().catch(() => ({})) as { error?: { status?: string } };
+    const errorStatus = body.error?.status;
+    const message = response.status === 429
+      ? 'API Key 可以連線，但目前已達 Gemini 使用配額，請檢查 Google AI Studio 的配額設定。'
+      : errorStatus === 'PERMISSION_DENIED' || response.status === 403
+        ? 'API Key 無法使用 Gemini 服務，請確認金鑰限制與 Generative Language API 權限。'
+        : response.status === 400
+          ? 'API Key 格式無效，請重新建立或貼上正確的 Gemini API Key。'
+          : `Gemini API Key 驗證失敗（${response.status}），請稍後重試或更新金鑰。`;
+    return { status: 'invalid', message };
+  } catch (error) {
+    return {
+      status: 'invalid',
+      message: error instanceof DOMException && error.name === 'AbortError'
+        ? 'Gemini 連線驗證逾時，請確認網路後重新檢查。'
+        : '目前無法連線 Gemini 驗證服務，請確認網路後重新檢查。',
+    };
+  } finally {
+    window.clearTimeout(timeout);
+  }
 }
 
 export async function analyzeImageForWords(
@@ -28,7 +87,7 @@ export async function analyzeImageForWords(
     throw new Error('未設定 Gemini API Key。請至管理後台「設定」分頁填入您的 Gemini API Key 即可啟用辨識功能！');
   }
 
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=${apiKey}`;
+  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_VISION_MODEL}:generateContent?key=${apiKey}`;
 
   const promptText = `你是一個專業的國小兒童英文單字提取助手。請分析這張圖片，提取圖片中所有出現的英文單字。
 請以純 JSON 格式回傳一個 JSON Array，每一個元素需包含以下欄位：

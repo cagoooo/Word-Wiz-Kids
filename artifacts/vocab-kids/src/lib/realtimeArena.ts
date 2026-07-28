@@ -50,6 +50,21 @@ export interface ArenaRoom {
 
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
 export const ARENA_QUESTION_DURATION_MS = 15_000;
+export const ARENA_HOST_SESSION_KEY = 'word-wiz-arena-host-pin';
+
+export function getArenaErrorMessage(error: unknown, fallback = '即時對戰服務暫時無法使用，請稍後再試。'): string {
+  const message = error instanceof Error ? error.message : '';
+  if (message.includes('auth/operation-not-allowed')) {
+    return 'Firebase 匿名登入尚未啟用，請先在 Authentication 後臺開啟匿名登入。';
+  }
+  if (message.includes('auth/requests-from-referer')) {
+    return 'Firebase API Key 尚未允許目前的網站網域，請在 Google Cloud 金鑰限制中加入此網域。';
+  }
+  if (message.includes('PERMISSION_DENIED') || message.includes('permission-denied')) {
+    return 'Firebase 對戰資料權限不足，請確認 Realtime Database 規則已部署。';
+  }
+  return message || fallback;
+}
 
 function requireArenaDatabase() {
   if (!isFirebaseConfigured || !rtdb) {

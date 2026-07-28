@@ -4,6 +4,8 @@ import { ArrowLeft, ArrowRight, Gamepad2, Loader2, Sparkles, Trophy, Users, Wifi
 import { Link } from 'wouter';
 import {
   createArenaRoom,
+  ARENA_HOST_SESSION_KEY,
+  getArenaErrorMessage,
   startArenaQuestion,
   subscribeArenaRoom,
   updateArenaStatus,
@@ -14,13 +16,11 @@ import { AudioButton } from '@/components/ui/AudioButton';
 import { sfxLevelComplete } from '@/lib/soundEngine';
 import { useWordLibrary } from '@/hooks/useWordLibrary';
 
-const HOST_SESSION_KEY = 'word-wiz-arena-host-pin';
-
 export default function ArenaHost() {
   const { words, categories, loading, error: wordError } = useWordLibrary();
   const [category, setCategory] = useState('全部');
   const [questionCount, setQuestionCount] = useState(5);
-  const [pin, setPin] = useState<string | null>(() => sessionStorage.getItem(HOST_SESSION_KEY));
+  const [pin, setPin] = useState<string | null>(() => sessionStorage.getItem(ARENA_HOST_SESSION_KEY));
   const [room, setRoom] = useState<ArenaRoom | null>(null);
   const [timer, setTimer] = useState(15);
   const [creating, setCreating] = useState(false);
@@ -39,7 +39,7 @@ export default function ArenaHost() {
       pin,
       (updatedRoom) => {
         if (!updatedRoom) {
-          sessionStorage.removeItem(HOST_SESSION_KEY);
+          sessionStorage.removeItem(ARENA_HOST_SESSION_KEY);
           setPin(null);
           setRoom(null);
           setError('原本的對戰房間已不存在，請重新建立');
@@ -79,10 +79,10 @@ export default function ArenaHost() {
     setError('');
     try {
       const newPin = await createArenaRoom(category, words, questionCount);
-      sessionStorage.setItem(HOST_SESSION_KEY, newPin);
+      sessionStorage.setItem(ARENA_HOST_SESSION_KEY, newPin);
       setPin(newPin);
     } catch (createError) {
-      setError(createError instanceof Error ? createError.message : '建立房間失敗');
+      setError(getArenaErrorMessage(createError, '建立房間失敗'));
     } finally {
       setCreating(false);
     }
@@ -191,7 +191,7 @@ export default function ArenaHost() {
       )}
 
       {room.status === 'finished' && (
-        <div className="w-full max-w-2xl rounded-3xl border-4 border-amber-400 bg-card p-6 sm:p-8 text-center shadow-2xl"><Trophy className="mx-auto mb-4 h-20 w-20 animate-bounce text-amber-500" /><h2 className="mb-2 text-3xl font-black text-foreground">全班對戰完成！</h2><p className="mb-7 text-sm text-muted-foreground">恭喜所有完成挑戰的單字英雄！</p><div className="mb-8 space-y-3">{sortedPlayers.slice(0, 5).map((player, index) => <div key={player.id} className="flex items-center justify-between rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 font-black"><span className="text-lg text-amber-700">第 {index + 1} 名 · {player.nickname}</span><span className="text-xl text-primary">{player.score} 分</span></div>)}</div><div className="grid grid-cols-2 gap-3"><Link href="/" className="rounded-2xl bg-muted px-4 py-3.5 font-bold text-foreground">回到首頁</Link><button onClick={() => { sessionStorage.removeItem(HOST_SESSION_KEY); setPin(null); setRoom(null); }} className="rounded-2xl bg-primary px-4 py-3.5 font-bold text-white">建立新對戰</button></div></div>
+        <div className="w-full max-w-2xl rounded-3xl border-4 border-amber-400 bg-card p-6 sm:p-8 text-center shadow-2xl"><Trophy className="mx-auto mb-4 h-20 w-20 animate-bounce text-amber-500" /><h2 className="mb-2 text-3xl font-black text-foreground">全班對戰完成！</h2><p className="mb-7 text-sm text-muted-foreground">恭喜所有完成挑戰的單字英雄！</p><div className="mb-8 space-y-3">{sortedPlayers.slice(0, 5).map((player, index) => <div key={player.id} className="flex items-center justify-between rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 font-black"><span className="text-lg text-amber-700">第 {index + 1} 名 · {player.nickname}</span><span className="text-xl text-primary">{player.score} 分</span></div>)}</div><div className="grid grid-cols-2 gap-3"><Link href="/" className="rounded-2xl bg-muted px-4 py-3.5 font-bold text-foreground">回到首頁</Link><button onClick={() => { sessionStorage.removeItem(ARENA_HOST_SESSION_KEY); setPin(null); setRoom(null); }} className="rounded-2xl bg-primary px-4 py-3.5 font-bold text-white">建立新對戰</button></div></div>
       )}
     </div>
   );
