@@ -1,0 +1,106 @@
+{
+  "version": 1,
+  "tracks": [
+    {
+      "id": "bgm-learn",
+      "kind": "music",
+      "path": "assets/audio/bgm-learn.mp3",
+      "scene": "learn",
+      "loop": true,
+      "sourceProject": "H:/Fight",
+      "sourceFile": "battle-data.mp3",
+      "sourceSha256": "6071E5E5795B49FD5B6CCFA40BA6A74FE9809119D6050A989D12062B54ABACF5",
+      "sunoClipId": "285ceb06-719c-45d0-9b6e-4d8c9c77bd1b",
+      "license": "Teacher-owned Suno Pro generation",
+      "deploymentStatus": "approved",
+      "sha256": "BBD10E3EC4FBE47F9284C5B9D90CC2EB8213CFC15EA7599FC6078A86FE0D7056"
+    },
+    {
+      "id": "bgm-game",
+      "kind": "music",
+      "path": "assets/audio/bgm-game.mp3",
+      "scene": "game",
+      "loop": true,
+      "sourceProject": "H:/Fight",
+      "sourceFile": "smes-it-battle.mp3",
+      "sourceSha256": "78B523702A78CBDDCDEAA2B1754FE81B862201FE1BF8F0F0093FBE6B5804B056",
+      "sunoClipId": "8ef0c939-2a2c-4c37-80ef-91ffb8463aa5",
+      "license": "Teacher-owned Suno Pro generation",
+      "deploymentStatus": "approved",
+      "sha256": "AB72431CE4220A2A7AA5E1D435A66BC57F734323794E4162E25C0DE5E2E40E3E"
+    },
+    {
+      "id": "bgm-arena",
+      "kind": "music",
+      "path": "assets/audio/bgm-arena.mp3",
+      "scene": "arena",
+      "loop": true,
+      "sourceProject": "H:/Fight",
+      "sourceFile": "battle-coder.mp3",
+      "sourceSha256": "9581FDCBB8E6D753EDABA01B17CCF5FC80F91DCBFFA6DCAC2D52214B8AFDFBF0",
+      "sunoClipId": "386faa39-78d0-48d2-80ea-319fc3adc8e4",
+      "license": "Teacher-owned Suno Pro generation",
+      "deploymentStatus": "approved",
+      "sha256": "822181363CF15FF5343F3EE865C4693A6E795BAE34606054D26DFE73EC027624"
+    },
+    {
+      "id": "sfx-complete",
+      "kind": "stinger",
+      "path": "assets/audio/sfx-complete.mp3",
+      "loop": false,
+      "sourceProject": "H:/Fight",
+      "sourceFile": "ultimate-creator.mp3",
+      "sourceSha256": "474A655829E203425DE74EA6464ADAF3161FE6DBDD927A51E5EEABFBC7DE43F2",
+      "sunoClipId": "6c7f8958-debf-4ec6-bf29-7b80bc4749a9",
+      "license": "Teacher-owned Suno Pro generation",
+      "deploymentStatus": "approved",
+      "sha256": "DF3AC1CE79668FBCA0E6869D921EF8A62722C3A417D6F02247A3C8D54B01AB93"
+    },
+    {
+      "id": "sfx-correct",
+      "kind": "sound-effect",
+      "path": "assets/audio/sfx-correct.mp3",
+      "loop": false,
+      "sourceProject": "H:/Poke",
+      "sourceFile": "correct.mp3",
+      "license": "Pixabay Content License",
+      "credit": "Notification - correct answer by delon_boomkin",
+      "deploymentStatus": "approved",
+      "sha256": "BABC27C7A0FF3BB7DFF7F2A3389D28935882F77E3335E3AA1A79A18C0824DF98"
+    },
+    {
+      "id": "sfx-wrong",
+      "kind": "sound-effect",
+      "path": "assets/audio/sfx-wrong.mp3",
+      "loop": false,
+      "sourceProject": "H:/Poke",
+      "sourceFile": "wrong.mp3",
+      "license": "Pixabay Content License",
+      "credit": "Notification - wrong answer by cartoon-music-game-sfx",
+      "deploymentStatus": "approved",
+      "sha256": "04DFAF2B94564D2F394E664578DE9D2DB95E6B5D9963EE0BEB778439883977D3"
+    },
+    {
+      "id": "sfx-card-flip",
+      "kind": "sound-effect",
+      "path": "assets/audio/sfx-card-flip.mp3",
+      "loop": false,
+      "sourceProject": "H:/MBTI",
+      "sourceFile": "pageTurn.mp3",
+      "license": "Pixabay Content License",
+      "deploymentStatus": "approved",
+      "sha256": "EAA7E6BE451E8345BFAC3AA1E1DEA1863687168B4BF693ED22843E093D2380FE"
+    },
+    {
+      "id": "sfx-button-tap",
+      "kind": "sound-effect",
+      "path": "assets/audio/sfx-button-tap.mp3",
+      "loop": false,
+      "sourceProject": "H:/MBTI",
+      "sourceFile": "tap.mp3",
+      "license": "Pixabay Content License",
+      "deploymentStatus": "approved",
+      "sha256": "1315757B88B8EA4C24FDF52663C91386006ED9273BDF457EA0655938FD605690"
+    }
+  ]
+}
