@@ -35,9 +35,21 @@ function announceUpdate(worker: ServiceWorker | null, version: string) {
   );
 }
 
-async function announceWaitingWorker(worker: ServiceWorker | null) {
+async function fetchLatestVersion(): Promise<string | null> {
+  try {
+    const versionUrl = `${import.meta.env.BASE_URL}version.json?t=${Date.now()}`;
+    const response = await fetch(versionUrl, { cache: 'no-store' });
+    if (!response.ok) return null;
+    const data = await response.json() as { version?: string };
+    return typeof data.version === 'string' ? data.version : null;
+  } catch {
+    return null;
+  }
+}
+
+async function announceWaitingWorker(worker: ServiceWorker | null, fallbackVersion?: string | null) {
   if (!worker) return;
-  const version = await getWorkerVersion(worker);
+  const version = await getWorkerVersion(worker) || fallbackVersion || await fetchLatestVersion();
   if (version) announceUpdate(worker, version);
 }
 
@@ -118,21 +130,24 @@ if ('serviceWorker' in navigator) {
       }
     });
 
-    window.addEventListener('load', () => {
+    const registerServiceWorker = () => {
       const swUrl = `${import.meta.env.BASE_URL}sw.js`;
       navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' }).then((registration) => {
         activeRegistration = registration;
+        const watchedWorkers = new WeakSet<ServiceWorker>();
 
         const watchWorker = (worker: ServiceWorker) => {
+          if (watchedWorkers.has(worker)) return;
+          watchedWorkers.add(worker);
           worker.addEventListener('statechange', () => {
             if (worker.state === 'installed' && navigator.serviceWorker.controller) {
-              void announceWaitingWorker(worker);
+              void fetchLatestVersion().then((version) => announceWaitingWorker(worker, version));
             }
           });
         };
 
         if (registration.waiting) {
-          void announceWaitingWorker(registration.waiting);
+          void fetchLatestVersion().then((version) => announceWaitingWorker(registration.waiting, version));
         }
 
         if (registration.installing) watchWorker(registration.installing);
@@ -145,18 +160,18 @@ if ('serviceWorker' in navigator) {
       }).catch((err) => {
         console.log('ServiceWorker registration failed: ', err);
       });
-    });
+    };
+
+    if (document.readyState === 'complete') registerServiceWorker();
+    else window.addEventListener('load', registerServiceWorker, { once: true });
 
     const checkVersion = async () => {
       try {
         await activeRegistration?.update();
-        const versionUrl = `${import.meta.env.BASE_URL}version.json?t=${Date.now()}`;
-        const response = await fetch(versionUrl, { cache: 'no-store' });
-        if (!response.ok) return;
-        const data = await response.json() as { version?: string };
-        if (APP_VERSION !== 'development' && data.version && isNewerBuildVersion(data.version, APP_VERSION)) {
+        const latestVersion = await fetchLatestVersion();
+        if (APP_VERSION !== 'development' && latestVersion && isNewerBuildVersion(latestVersion, APP_VERSION)) {
           if (activeRegistration?.waiting) {
-            await announceWaitingWorker(activeRegistration.waiting);
+            await announceWaitingWorker(activeRegistration.waiting, latestVersion);
           }
         }
       } catch {
