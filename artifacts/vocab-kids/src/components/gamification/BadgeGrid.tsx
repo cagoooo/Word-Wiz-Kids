@@ -14,14 +14,14 @@ export const BadgeGridModal: React.FC<BadgeGridProps> = ({ isOpen, onClose }) =>
   const unlockedCount = stats.badges.length;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-2xl bg-card border border-border rounded-3xl p-6 shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+    <div className="fixed inset-0 z-[100] flex items-start justify-center overflow-y-auto overscroll-contain bg-black/60 px-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md animate-in fade-in duration-200 sm:items-center sm:p-4">
+      <div className="relative flex max-h-[calc(100dvh-1.5rem)] min-h-0 w-full max-w-2xl flex-col overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-2xl sm:max-h-[90dvh] sm:rounded-3xl sm:p-6">
         {/* Glow decoration */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
 
         {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-border mb-5">
-          <div className="flex items-center gap-3">
+        <div className="relative z-10 mb-4 flex shrink-0 items-start justify-between gap-3 border-b border-border pb-4 sm:mb-5 sm:items-center">
+          <div className="flex min-w-0 items-center gap-3">
             <div className="p-3 bg-gradient-to-tr from-amber-400 to-purple-600 rounded-2xl text-white shadow-lg">
               <Award className="w-6 h-6" />
             </div>
@@ -40,14 +40,15 @@ export const BadgeGridModal: React.FC<BadgeGridProps> = ({ isOpen, onClose }) =>
 
           <button
             onClick={onClose}
-            className="p-2 rounded-xl bg-muted hover:bg-muted/80 text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+            aria-label="關閉成就殿堂"
+            className="shrink-0 cursor-pointer rounded-xl bg-muted p-2 text-muted-foreground transition-colors hover:bg-muted/80 hover:text-foreground"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Badges Grid */}
-        <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-4 gap-4 pr-1">
+        <div className="grid min-h-0 flex-1 touch-pan-y grid-cols-2 gap-4 overflow-y-auto overscroll-contain pb-1 pr-1 [-webkit-overflow-scrolling:touch] sm:grid-cols-4">
           {ALL_BADGES.map((badge) => {
             const isUnlocked = stats.badges.includes(badge.id);
 
