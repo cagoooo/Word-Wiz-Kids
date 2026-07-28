@@ -1,5 +1,5 @@
 // CI 注入「workflow run number + commit hash」；同一 commit 重跑時版本保持不變。
-const BUILD_VERSION = "48-1f94ec2da858";
+const BUILD_VERSION = "49-119058ef7fb3";
 const CACHE_NAME = `vocab-kids-${BUILD_VERSION}`;
 const ASSETS = [
   "./manifest.webmanifest?v=10",
