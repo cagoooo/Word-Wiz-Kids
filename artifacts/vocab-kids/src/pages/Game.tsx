@@ -517,9 +517,9 @@ export default function Game() {
     if (!q) return null;
 
     return (
-      <div className="game-question-shell relative z-10 w-full max-w-6xl flex flex-col h-[calc(100dvh-4rem)] min-h-[320px] pt-3 pb-4 px-3 sm:pt-4 sm:pb-5 sm:px-4 md:px-8">
+      <div className="game-question-shell relative z-10 w-full max-w-6xl flex flex-col min-h-[calc(100dvh-4rem)] pt-3 pb-4 px-3 sm:pt-4 sm:pb-5 sm:px-4 md:px-8">
         {/* Top Bar */}
-        <div className="game-score-bar flex justify-between items-center mb-3 sm:mb-5 bg-card/95 backdrop-blur-md rounded-full p-2 pl-4 sm:pl-8 pr-2 sm:pr-4 shadow-lg border-2 sm:border-4 border-white/20">
+        <div className="game-score-bar sticky top-16 z-30 flex justify-between items-center mb-3 sm:mb-5 bg-card/95 backdrop-blur-md rounded-full p-2 pl-4 sm:pl-8 pr-2 sm:pr-4 shadow-lg border-2 sm:border-4 border-white/20">
           <div className="game-question-count text-sm sm:text-2xl font-black text-muted-foreground tracking-wider whitespace-nowrap">
             {state.currentQuestionIndex + 1} / {state.questions.length} 題
           </div>
@@ -773,11 +773,11 @@ export default function Game() {
   };
 
   return (
-    <div className={`min-h-[100dvh] pt-16 flex flex-col items-center relative bg-background ${
+    <div className={`game-page min-h-[100dvh] pt-16 flex flex-col items-center relative bg-background ${
       state.phase === 'countdown'
         ? 'justify-center overflow-hidden'
         : state.phase === 'question'
-          ? 'justify-start overflow-y-auto'
+          ? 'justify-start overflow-x-clip'
           : 'justify-start md:justify-center overflow-y-auto py-4 sm:py-6 md:py-0'
     }`}>
       <style>{`

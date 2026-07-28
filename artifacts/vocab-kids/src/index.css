@@ -5,6 +5,11 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 固定導覽列的安全距離：即使瀏覽器縮放或舊裝置對 dvh 計算不同，也不會蓋住分數列。 */
+.game-page {
+  padding-top: calc(4rem + env(safe-area-inset-top)) !important;
+}
+
 /* 遊戲在短螢幕改用緊湊答案列，避免平板橫向時分數或選項被推出畫面。 */
 @media (max-height: 700px) and (min-width: 768px) {
   .game-answer-button {
