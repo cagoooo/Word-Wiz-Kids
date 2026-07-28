@@ -5,6 +5,7 @@ import { Link } from 'wouter';
 import { joinArenaRoom, subscribeArenaRoom, subscribeArenaServerTimeOffset, submitArenaAnswer, type ArenaRoom } from '@/lib/realtimeArena';
 import { getArenaTimeState } from '@/lib/arenaScoring';
 import { sfxCorrect, sfxWrong } from '@/lib/soundEngine';
+import { speakText, speakWord } from '@/lib/tts';
 import { loadStudent } from '@/hooks/useStudent';
 import { AVATAR_COLORS, AVATAR_EMOJIS } from '@/components/student/NicknameSetup';
 
@@ -34,6 +35,7 @@ export default function ArenaPlayer() {
   const [playerId, setPlayerId] = useState<string | null>(savedSession?.playerId ?? null);
   const [room, setRoom] = useState<ArenaRoom | null>(null);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
+  const [pendingIndex, setPendingIndex] = useState<number | null>(null);
   const [answerResult, setAnswerResult] = useState<boolean | null>(null);
   const [pointsAwarded, setPointsAwarded] = useState(0);
   const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
@@ -83,6 +85,7 @@ export default function ArenaPlayer() {
 
   useEffect(() => {
     setSelectedOption(null);
+    setPendingIndex(null);
     setAnswerResult(null);
     setPointsAwarded(0);
     setError('');
@@ -112,7 +115,10 @@ export default function ArenaPlayer() {
   const handleAnswer = async (optionIndex: number) => {
     if (!room || selectedOption !== null || !playerId) return;
     setSelectedOption(optionIndex);
+    setPendingIndex(null);
     setError('');
+    const option = room.questions[room.currentQuestionIndex]?.options[optionIndex];
+    if (option) void speakWord(option.english);
     try {
       const result = await submitArenaAnswer(pin, playerId, optionIndex);
       setAnswerResult(result.isCorrect);
@@ -123,6 +129,39 @@ export default function ArenaPlayer() {
       setSelectedOption(null);
       setError(answerError instanceof Error ? answerError.message : '答案送出失敗，請再試一次');
     }
+  };
+
+  const handleOptionClick = (optionIndex: number) => {
+    if (!room || selectedOption !== null || timeState.remainingMs <= 0) return;
+    const question = room.questions[room.currentQuestionIndex];
+    const option = question?.options[optionIndex];
+    if (!question || !option) return;
+
+    const optionLabel = question.direction === 'en_to_zh' ? option.chinese : option.english;
+    const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+
+    if (isDesktop) {
+      setPendingIndex(null);
+      void handleAnswer(optionIndex);
+      return;
+    }
+
+    if (pendingIndex !== optionIndex) {
+      setPendingIndex(optionIndex);
+      void speakText(optionLabel);
+      return;
+    }
+
+    void handleAnswer(optionIndex);
+  };
+
+  const handleOptionHover = (optionIndex: number) => {
+    if (!room || selectedOption !== null || timeState.remainingMs <= 0) return;
+    if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+    const question = room.questions[room.currentQuestionIndex];
+    const option = question?.options[optionIndex];
+    if (!question || !option) return;
+    void speakText(question.direction === 'en_to_zh' ? option.chinese : option.english);
   };
 
   if (!joined) {
@@ -169,7 +208,11 @@ export default function ArenaPlayer() {
             <h3 className="text-3xl font-black text-primary">{currentQuestion.direction === 'en_to_zh' ? currentQuestion.word.english : currentQuestion.word.chinese}</h3>
             <p className="mt-2 text-xs font-bold text-muted-foreground">答得越快，速度加成越高！</p>
           </div>
-          <div className="grid grid-cols-2 gap-3">{currentQuestion.options.map((option, index) => { const selected = selectedOption === index; return <button key={option.id} onClick={() => handleAnswer(index)} disabled={selectedOption !== null || timeState.remainingMs <= 0} className={`relative flex min-h-28 flex-col items-center justify-center rounded-2xl p-3 text-white shadow-xl transition active:scale-95 disabled:cursor-default disabled:opacity-70 ${['bg-rose-500','bg-blue-500','bg-amber-500','bg-emerald-500'][index]} ${selected ? 'ring-4 ring-white scale-[1.03]' : ''}`}><span className="mb-1 text-3xl font-black">{['▲','◆','●','■'][index]}</span><span className="break-words text-lg font-black leading-tight">{currentQuestion.direction === 'en_to_zh' ? option.chinese : option.english}</span>{selected && answerResult !== null && <span className="absolute right-2 top-2">{answerResult ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}</span>}</button>; })}</div>
+          <p className="mb-2 text-xs font-bold text-muted-foreground">
+            <span className="hidden [@media(hover:hover)_and_(pointer:fine)]:inline">🔊 滑鼠移到選項即可聽發音</span>
+            <span className="[@media(hover:hover)_and_(pointer:fine)]:hidden">🔊 點一下聽發音，再按一次確認答案</span>
+          </p>
+          <div className="grid grid-cols-2 gap-3">{currentQuestion.options.map((option, index) => { const selected = selectedOption === index; const pending = pendingIndex === index; return <button key={option.id} onClick={() => handleOptionClick(index)} onMouseEnter={() => handleOptionHover(index)} disabled={selectedOption !== null || timeState.remainingMs <= 0} data-testid={`arena-answer-${index}`} className={`relative flex min-h-28 flex-col items-center justify-center rounded-2xl p-3 text-white shadow-xl transition active:scale-95 disabled:cursor-default disabled:opacity-70 ${['bg-rose-500','bg-blue-500','bg-amber-500','bg-emerald-500'][index]} ${selected ? 'ring-4 ring-white scale-[1.03]' : ''} ${pending ? 'z-10 scale-[1.04] animate-pulse ring-4 ring-yellow-300 shadow-[0_0_24px_rgba(250,204,21,0.85)]' : ''}`}><span className="mb-1 text-3xl font-black">{['▲','◆','●','■'][index]}</span><span className="break-words text-lg font-black leading-tight">{currentQuestion.direction === 'en_to_zh' ? option.chinese : option.english}</span>{pending && <span className="absolute -top-3 right-2 rounded-full border border-yellow-400 bg-yellow-300 px-2.5 py-1 text-[10px] font-black text-black shadow-md">🔊 再按一次確認！</span>}{selected && answerResult !== null && <span className="absolute right-2 top-2">{answerResult ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}</span>}</button>; })}</div>
           {timeState.remainingMs <= 0 && selectedOption === null && <p className="mt-4 rounded-xl bg-rose-500/10 p-3 text-sm font-black text-rose-600">時間到！等待本題排名…</p>}
           {selectedOption !== null && answerResult === null && <p className="mt-4 flex items-center justify-center gap-2 text-sm font-bold text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> 送出答案中…</p>}
           {answerResult !== null && <p className={`mt-4 text-lg font-black ${answerResult ? 'text-emerald-600' : 'text-rose-600'}`}>{answerResult ? `✅ 答對了！獲得 ${pointsAwarded} 分（含速度加成）` : '❌ 再接再厲！'}</p>}
