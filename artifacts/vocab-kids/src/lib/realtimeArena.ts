@@ -39,6 +39,7 @@ export interface ArenaRoom {
   category: string;
   status: 'waiting' | 'question' | 'leaderboard' | 'finished';
   currentQuestionIndex: number;
+  currentCorrectIndex: number;
   questionStartedAt: number;
   questionDurationMs: number;
   questions: ArenaQuestion[];
@@ -106,6 +107,7 @@ export async function createArenaRoom(
       category,
       status: 'waiting',
       currentQuestionIndex: 0,
+      currentCorrectIndex: questions[0].correctIndex,
       questionStartedAt: 0,
       questionDurationMs: ARENA_QUESTION_DURATION_MS,
       questions,
@@ -180,9 +182,13 @@ export function subscribeArenaRoom(
 export async function startArenaQuestion(pin: string, questionIndex: number): Promise<void> {
   const database = requireArenaDatabase();
   await ensureAnonymousAuth();
+  const questionSnapshot = await get(ref(database, `arena_rooms/${pin}/questions/${questionIndex}`));
+  if (!questionSnapshot.exists()) throw new Error('找不到這一題，請重新建立房間');
+  const question = questionSnapshot.val() as ArenaQuestion;
   await update(ref(database, `arena_rooms/${pin}`), {
     status: 'question',
     currentQuestionIndex: questionIndex,
+    currentCorrectIndex: question.correctIndex,
     questionStartedAt: serverTimestamp(),
   });
 }
