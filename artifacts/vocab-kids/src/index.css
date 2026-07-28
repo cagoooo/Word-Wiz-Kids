@@ -5,6 +5,32 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 遊戲在短螢幕改用緊湊答案列，避免平板橫向時分數或選項被推出畫面。 */
+@media (max-height: 700px) and (min-width: 768px) {
+  .game-answer-button {
+    min-height: 4rem !important;
+    padding: 0.45rem 1.25rem !important;
+    gap: 1rem !important;
+  }
+
+  .game-answer-icon svg {
+    width: 2rem !important;
+    height: 2rem !important;
+  }
+
+  .game-answer-label {
+    font-size: 1.5rem !important;
+  }
+}
+
+@media (max-height: 500px) {
+  .game-answer-button {
+    min-height: 3.25rem !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+  }
+}
+
 @theme inline {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));

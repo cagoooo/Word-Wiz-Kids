@@ -517,10 +517,10 @@ export default function Game() {
     if (!q) return null;
 
     return (
-      <div className="relative z-10 w-full max-w-6xl flex flex-col min-h-[100dvh] pt-3 pb-4 px-3 sm:pt-4 sm:pb-5 sm:px-4 md:px-8">
+      <div className="game-question-shell relative z-10 w-full max-w-6xl flex flex-col h-[calc(100dvh-4rem)] min-h-[320px] pt-3 pb-4 px-3 sm:pt-4 sm:pb-5 sm:px-4 md:px-8">
         {/* Top Bar */}
-        <div className="flex justify-between items-center mb-3 sm:mb-5 bg-card/95 backdrop-blur-md rounded-full p-2 pl-4 sm:pl-8 pr-2 sm:pr-4 shadow-lg border-2 sm:border-4 border-white/20">
-          <div className="text-sm sm:text-2xl font-black text-muted-foreground tracking-wider whitespace-nowrap">
+        <div className="game-score-bar flex justify-between items-center mb-3 sm:mb-5 bg-card/95 backdrop-blur-md rounded-full p-2 pl-4 sm:pl-8 pr-2 sm:pr-4 shadow-lg border-2 sm:border-4 border-white/20">
+          <div className="game-question-count text-sm sm:text-2xl font-black text-muted-foreground tracking-wider whitespace-nowrap">
             {state.currentQuestionIndex + 1} / {state.questions.length} 題
           </div>
 
@@ -537,13 +537,13 @@ export default function Game() {
                 </motion.div>
               )}
             </AnimatePresence>
-            <div className="bg-primary text-primary-foreground px-4 sm:px-8 py-2 sm:py-3 rounded-full text-xl sm:text-3xl font-black shadow-inner border-2 border-primary-foreground/20 whitespace-nowrap">
+            <div className="game-score-pill bg-primary text-primary-foreground px-4 sm:px-8 py-2 sm:py-3 rounded-full text-xl sm:text-3xl font-black shadow-inner border-2 border-primary-foreground/20 whitespace-nowrap">
               {state.score} 分
             </div>
             {/* Mute toggle */}
             <button
               onClick={toggleMute}
-              className="text-white/80 hover:text-white transition-colors bg-white/15 hover:bg-white/25 p-2 sm:p-2.5 rounded-full"
+              className="game-mute-button text-white/80 hover:text-white transition-colors bg-white/15 hover:bg-white/25 p-2 sm:p-2.5 rounded-full"
               aria-label={muted ? '開啟音效' : '關閉音效'}
             >
               {muted
@@ -554,20 +554,20 @@ export default function Game() {
         </div>
 
         {/* Word Display */}
-        <div className="flex flex-col items-center justify-center mb-3 sm:mb-4 relative">
+        <div className="game-word-section flex flex-col items-center justify-center mb-3 sm:mb-4 relative">
           {/* Direction badge */}
-          <div className={`mb-2 sm:mb-3 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-black tracking-widest shadow-sm border-2 ${q.direction === 'en_to_zh' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
+          <div className={`game-direction-badge mb-2 sm:mb-3 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-black tracking-widest shadow-sm border-2 ${q.direction === 'en_to_zh' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
             {q.direction === 'en_to_zh' ? '看英文，選中文' : '看中文，選英文'}
           </div>
 
-          <div className="text-center bg-card rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl border-4 sm:border-8 border-white w-full py-4 sm:py-8 md:py-14 relative overflow-hidden flex flex-col items-center justify-center min-h-[90px] sm:min-h-[140px] md:min-h-[180px]">
+          <div className="game-word-card text-center bg-card rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl border-4 sm:border-8 border-white w-full py-4 sm:py-8 md:py-14 relative overflow-hidden flex flex-col items-center justify-center min-h-[90px] sm:min-h-[140px] md:min-h-[180px]">
             <AnimatePresence mode="wait">
               <motion.h2
                 key={q.word.id + q.direction}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="font-black text-foreground drop-shadow-sm px-3 break-words w-full"
+                className="game-prompt font-black text-foreground drop-shadow-sm px-3 break-words w-full"
                 style={{ fontSize: 'clamp(1.5rem, 10vw, 7rem)', letterSpacing: '0.02em' }}
               >
                 {q.direction === 'en_to_zh' ? q.word.english : q.word.chinese}
@@ -591,7 +591,7 @@ export default function Game() {
                     : speakText(q.word.chinese);
                 }
               }}
-              className="mt-2 sm:mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs sm:text-sm font-bold transition-all hover:scale-105 active:scale-95 border border-primary/20"
+              className="game-replay-button mt-2 sm:mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs sm:text-sm font-bold transition-all hover:scale-105 active:scale-95 border border-primary/20"
               title="重新播放發音"
             >
               <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
@@ -613,7 +613,7 @@ export default function Game() {
           </div>
 
           {/* Timer bar */}
-          <div className="w-full h-3 sm:h-5 bg-card/40 backdrop-blur-sm rounded-full mt-3 sm:mt-5 overflow-hidden shadow-inner border-2 sm:border-4 border-white/30 p-0.5">
+          <div className="game-timer w-full h-3 sm:h-5 bg-card/40 backdrop-blur-sm rounded-full mt-3 sm:mt-5 overflow-hidden shadow-inner border-2 sm:border-4 border-white/30 p-0.5">
             <div
               className={`h-full rounded-full ${state.selectedOptionIndex !== null ? (state.selectedOptionIndex === q.correctIndex ? 'bg-green-400' : 'bg-red-400') : 'bg-primary'}`}
               style={{
@@ -626,8 +626,8 @@ export default function Game() {
         </div>
 
         {/* Answers Grid */}
-        <div className="w-full shrink-0 mt-auto flex flex-col gap-1.5">
-          <div className="text-center text-xs sm:text-sm font-bold text-white/90 drop-shadow mb-1 flex items-center justify-center gap-1">
+        <div className="game-answers w-full shrink-0 mt-auto flex flex-col gap-1.5">
+          <div className="game-answer-hint text-center text-xs sm:text-sm font-bold text-white/90 drop-shadow mb-1 flex items-center justify-center gap-1">
             <span className="hidden md:inline">💡 移到選項自動聽發音，點擊選項先確認，再按一次提交！</span>
             <span className="md:hidden">💡 點擊選項先聽發音，再按一次確認答案！</span>
           </div>
@@ -773,7 +773,7 @@ export default function Game() {
   };
 
   return (
-    <div className={`min-h-[100dvh] flex flex-col items-center relative bg-background ${
+    <div className={`min-h-[100dvh] pt-16 flex flex-col items-center relative bg-background ${
       state.phase === 'countdown'
         ? 'justify-center overflow-hidden'
         : state.phase === 'question'
@@ -785,6 +785,32 @@ export default function Game() {
           0% { background-position: 0% 50%; }
           50% { background-position: 100% 50%; }
           100% { background-position: 0% 50%; }
+        }
+
+        /* 橫向平板與較矮的筆電視窗：保留分數、題目與四個答案在同一畫面。 */
+        @media (max-height: 700px) {
+          .game-question-shell { padding-top: 0.35rem; padding-bottom: 0.5rem; }
+          .game-score-bar { margin-bottom: 0.35rem; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+          .game-word-section { margin-bottom: 0.35rem; }
+          .game-direction-badge { margin-bottom: 0.25rem; padding-top: 0.15rem; padding-bottom: 0.15rem; }
+          .game-word-card { min-height: 5rem; padding-top: 0.25rem; padding-bottom: 0.25rem; border-width: 4px; }
+          .game-prompt { font-size: clamp(1.5rem, 8vh, 3.5rem) !important; }
+          .game-replay-button { margin-top: 0.15rem; padding-top: 0.2rem; padding-bottom: 0.2rem; }
+          .game-timer { margin-top: 0.3rem; height: 0.7rem; border-width: 2px; }
+          .game-answers { gap: 0.25rem; }
+          .game-answer-hint { margin-bottom: 0; font-size: 0.7rem; line-height: 1rem; }
+        }
+
+        @media (max-height: 500px) {
+          .game-score-bar { margin-bottom: 0.2rem; padding: 0.15rem 0.5rem; border-width: 2px; }
+          .game-question-count { font-size: 0.875rem; }
+          .game-score-pill { padding: 0.2rem 1rem; font-size: 1.125rem; border-width: 1px; }
+          .game-mute-button { padding: 0.2rem; }
+          .game-mute-button svg { width: 1rem; height: 1rem; }
+          .game-direction-badge { font-size: 0.65rem; line-height: 0.85rem; }
+          .game-word-card { min-height: 4rem; }
+          .game-replay-button { font-size: 0.65rem; line-height: 0.85rem; }
+          .game-answer-hint { display: none; }
         }
       `}</style>
       <div 

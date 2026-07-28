@@ -53,7 +53,7 @@ export function AnswerButton({
       onMouseEnter={handleMouseEnter}
       data-testid={testId}
       className={[
-        'relative flex flex-col md:flex-row items-center justify-center md:justify-start',
+        'game-answer-button relative flex flex-col md:flex-row items-center justify-center md:justify-start',
         'gap-1 md:gap-6',
         'p-2 sm:p-3 md:p-8',
         'rounded-2xl sm:rounded-3xl w-full h-full',
@@ -72,10 +72,10 @@ export function AnswerButton({
         </span>
       )}
 
-      <div className="shrink-0">
+      <div className="game-answer-icon shrink-0">
         <Icon className="w-4 h-4 sm:w-6 sm:h-6 md:w-14 md:h-14 fill-current opacity-90 drop-shadow-sm" />
       </div>
-      <span className="text-sm sm:text-base md:text-4xl font-black tracking-wide text-center md:text-left drop-shadow-md leading-tight break-words max-w-full">
+      <span className="game-answer-label text-sm sm:text-base md:text-4xl font-black tracking-wide text-center md:text-left drop-shadow-md leading-tight break-words max-w-full">
         {label}
       </span>
     </motion.button>
