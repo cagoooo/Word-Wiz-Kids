@@ -1,12 +1,12 @@
-const CACHE_NAME = "vocab-kids-cache-v19";
+const CACHE_NAME = "vocab-kids-cache-v20";
 const ASSETS = [
   "./",
   "./index.html",
-  "./manifest.webmanifest?v=9",
-  "./icon.png?v=9",
-  "./favicon.png?v=9",
-  "./favicon.svg?v=9",
-  "./og-image.png?v=9"
+  "./manifest.webmanifest?v=10",
+  "./icon.png?v=10",
+  "./favicon.png?v=10",
+  "./favicon.svg?v=10",
+  "./og-image.png?v=10"
 ];
 
 // Force SW skipWaiting on explicit user click message only
