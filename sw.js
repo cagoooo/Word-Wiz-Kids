@@ -1,5 +1,5 @@
 // CI 會在每次部署後注入唯一版本，確保 sw.js bytes 必定改變並觸發 updatefound。
-const BUILD_VERSION = "08d13ed-30336971355-1";
+const BUILD_VERSION = "462fe82-30338663702-1";
 const CACHE_NAME = `vocab-kids-${BUILD_VERSION}`;
 const ASSETS = [
   "./manifest.webmanifest?v=10",
