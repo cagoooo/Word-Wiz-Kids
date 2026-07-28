@@ -6,6 +6,7 @@
 import { initializeApp, getApps, getApp, type FirebaseApp } from 'firebase/app';
 import { getFirestore, type Firestore } from 'firebase/firestore';
 import { getDatabase, type Database } from 'firebase/database';
+import { getAuth, signInAnonymously, type Auth, type User } from 'firebase/auth';
 
 const requiredKeys = [
   'VITE_FIREBASE_API_KEY',
@@ -28,6 +29,7 @@ export const isFirebaseConfigured: boolean = checkConfigured();
 let _app: FirebaseApp | null = null;
 let _db: Firestore | null = null;
 let _rtdb: Database | null = null;
+let _auth: Auth | null = null;
 
 if (isFirebaseConfigured) {
   const firebaseConfig = {
@@ -43,8 +45,29 @@ if (isFirebaseConfigured) {
   _app = getApps().length ? getApp() : initializeApp(firebaseConfig);
   _db = getFirestore(_app);
   _rtdb = getDatabase(_app);
+  _auth = getAuth(_app);
 }
 
 export const db: Firestore | null = _db;
 export const rtdb: Database | null = _rtdb;
+export const auth: Auth | null = _auth;
 
+let anonymousAuthPromise: Promise<User> | null = null;
+
+/** Ensure every arena device has a stable anonymous Firebase identity. */
+export function ensureAnonymousAuth(): Promise<User> {
+  if (!auth) return Promise.reject(new Error('即時對戰服務尚未完成設定'));
+  if (anonymousAuthPromise) return anonymousAuthPromise;
+
+  anonymousAuthPromise = (async () => {
+    await auth.authStateReady();
+    if (auth.currentUser) return auth.currentUser;
+    const credential = await signInAnonymously(auth);
+    return credential.user;
+  })().catch((error) => {
+    anonymousAuthPromise = null;
+    throw error;
+  });
+
+  return anonymousAuthPromise;
+}

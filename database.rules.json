@@ -1,0 +1,127 @@
+{
+  "rules": {
+    "election": {
+      ".read": true,
+      ".write": "auth != null",
+      "candidates": {
+        "$id": {
+          "votes": {
+            ".validate": "newData.isNumber() && newData.val() >= 0"
+          },
+          "name": {
+            ".validate": "newData.isString() && newData.val().length <= 30"
+          },
+          "imageUrl": {
+            ".validate": "newData.isString() && newData.val().length <= 500"
+          },
+          "id": {
+            ".validate": "newData.isNumber()"
+          }
+        }
+      },
+      "meta": {
+        "title": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "subtitle": { ".validate": "newData.isString() && newData.val().length <= 80" },
+        "locked": { ".validate": "newData.isBoolean()" }
+      },
+      "log": {
+        ".indexOn": ["ts"]
+      },
+      "presence": {
+        ".read": true,
+        "$sid": {
+          ".write": true,
+          ".validate": "newData.hasChild('ts')"
+        }
+      }
+    },
+    "arena_rooms": {
+      "$pin": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() && newData.child('hostUid').val() === auth.uid) || (data.exists() && data.child('hostUid').val() === auth.uid))",
+        ".validate": "!newData.exists() || ($pin.matches(/^[0-9]{4}$/) && newData.hasChildren(['pin', 'hostUid', 'hostName', 'category', 'status', 'currentQuestionIndex', 'questionStartedAt', 'questionDurationMs', 'questions', 'createdTime', 'expiresAt']))",
+        "pin": {
+          ".validate": "newData.isString() && newData.val() === $pin"
+        },
+        "hostUid": {
+          ".validate": "newData.isString() && ((!data.exists() && newData.val() === auth.uid) || newData.val() === data.val())"
+        },
+        "hostName": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 30"
+        },
+        "category": {
+          ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 50"
+        },
+        "status": {
+          ".validate": "newData.isString() && (newData.val() === 'waiting' || newData.val() === 'question' || newData.val() === 'leaderboard' || newData.val() === 'finished')"
+        },
+        "currentQuestionIndex": {
+          ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 14 && newData.parent().child('questions').child(newData.val()).exists()"
+        },
+        "questionStartedAt": {
+          ".validate": "newData.isNumber() && newData.val() >= 0"
+        },
+        "questionDurationMs": {
+          ".validate": "newData.isNumber() && newData.val() >= 5000 && newData.val() <= 60000"
+        },
+        "createdTime": {
+          ".validate": "newData.isNumber() && newData.val() > 0"
+        },
+        "expiresAt": {
+          ".validate": "newData.isNumber() && newData.val() > newData.parent().child('createdTime').val()"
+        },
+        "questions": {
+          ".validate": "newData.hasChild('0')",
+          "$questionIndex": {
+            ".validate": "$questionIndex.matches(/^(0|1|2|3|4|5|6|7|8|9|10|11|12|13|14)$/) && newData.hasChildren(['word', 'options', 'correctIndex', 'direction'])",
+            "correctIndex": {
+              ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3"
+            },
+            "direction": {
+              ".validate": "newData.val() === 'en_to_zh' || newData.val() === 'zh_to_en'"
+            },
+            "word": {
+              ".validate": "newData.hasChildren(['id', 'english', 'chinese', 'phonetic', 'category'])",
+              "id": { ".validate": "newData.isString() && newData.val().length <= 128" },
+              "english": { ".validate": "newData.isString() && newData.val().length <= 100" },
+              "chinese": { ".validate": "newData.isString() && newData.val().length <= 100" },
+              "phonetic": { ".validate": "newData.isString() && newData.val().length <= 150" },
+              "category": { ".validate": "newData.isString() && newData.val().length <= 50" },
+              "$other": { ".validate": false }
+            },
+            "options": {
+              ".validate": "newData.hasChildren(['0', '1', '2', '3'])",
+              "$optionIndex": {
+                ".validate": "$optionIndex.matches(/^[0-3]$/) && newData.hasChildren(['id', 'english', 'chinese', 'phonetic', 'category'])",
+                "id": { ".validate": "newData.isString() && newData.val().length <= 128" },
+                "english": { ".validate": "newData.isString() && newData.val().length <= 100" },
+                "chinese": { ".validate": "newData.isString() && newData.val().length <= 100" },
+                "phonetic": { ".validate": "newData.isString() && newData.val().length <= 150" },
+                "category": { ".validate": "newData.isString() && newData.val().length <= 50" },
+                "$other": { ".validate": false }
+              }
+            },
+            "$other": { ".validate": false }
+          }
+        },
+        "players": {
+          "$playerId": {
+            ".write": "auth != null && $playerId === auth.uid && ((!data.exists() && root.child('arena_rooms').child($pin).child('status').val() === 'waiting' && root.child('arena_rooms').child($pin).child('expiresAt').val() > now && newData.child('score').val() === 0) || (data.exists() && root.child('arena_rooms').child($pin).child('status').val() === 'question' && data.child('answerQuestionIndex').val() !== root.child('arena_rooms').child($pin).child('currentQuestionIndex').val() && newData.child('answerQuestionIndex').val() === root.child('arena_rooms').child($pin).child('currentQuestionIndex').val() && newData.child('currentAnswer').val() >= 0 && newData.child('currentAnswer').val() <= 3 && newData.child('isCorrect').val() === (newData.child('currentAnswer').val() === root.child('arena_rooms').child($pin).child('questions').child(root.child('arena_rooms').child($pin).child('currentQuestionIndex').val()).child('correctIndex').val()) && ((newData.child('isCorrect').val() === true && newData.child('score').val() === data.child('score').val() + 100) || (newData.child('isCorrect').val() === false && newData.child('score').val() === data.child('score').val())) && newData.child('id').val() === data.child('id').val() && newData.child('nickname').val() === data.child('nickname').val() && newData.child('avatar').val() === data.child('avatar').val() && newData.child('joinedAt').val() === data.child('joinedAt').val()))",
+            ".validate": "newData.hasChildren(['id', 'nickname', 'avatar', 'score', 'joinedAt']) && newData.child('id').val() === $playerId",
+            "id": { ".validate": "newData.isString() && newData.val() === $playerId" },
+            "nickname": { ".validate": "newData.isString() && newData.val().length > 0 && newData.val().length <= 12" },
+            "avatar": { ".validate": "newData.isNumber() && newData.val() >= 1 && newData.val() <= 8" },
+            "score": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "joinedAt": { ".validate": "newData.isNumber() && newData.val() > 0" },
+            "answerQuestionIndex": { ".validate": "newData.isNumber() && newData.val() >= 0" },
+            "currentAnswer": { ".validate": "newData.isNumber() && newData.val() >= 0 && newData.val() <= 3" },
+            "isCorrect": { ".validate": "newData.isBoolean()" },
+            "answeredAt": { ".validate": "newData.isNumber() && newData.val() > 0" },
+            "$other": { ".validate": false }
+          }
+        },
+        "$other": { ".validate": false }
+      }
+    }
+  }
+}
