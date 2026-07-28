@@ -1,27 +1,24 @@
-import { useReducer, useEffect, useState, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Star, Play, ArrowLeft, Trophy, Loader2, Volume2, VolumeX, WifiOff, RefreshCw } from 'lucide-react';
-import { Link } from 'wouter';
-import { speakWord, speakText } from '@/lib/tts';
-import { useWordLibrary } from '@/hooks/useWordLibrary';
-import { Confetti } from '@/components/game/Confetti';
-import { AnswerButton } from '@/components/game/AnswerButton';
-import { generateQuestions, calcScore, getStarRating, Question, QuestionOrderMode } from '@/lib/gameUtils';
-import { submitScore } from '@/lib/firestore';
-import { loadStudent, getOrCreateStudentId } from '@/hooks/useStudent';
-import {
-  startBGM, stopBGM,
-  sfxCorrect, sfxWrong,
-  sfxCountdownTick, sfxCountdownGo, sfxLevelComplete,
-} from '@/lib/soundEngine';
-import { useSoundSettings } from '@/hooks/useSoundSettings';
-import { UserExpBar } from '@/components/gamification/UserExpBar';
-import { AudioButton } from '@/components/ui/AudioButton';
-import { addExp, getUserStats, saveUserStats } from '@/lib/gamification';
-import { recordMistake } from '@/lib/mistakes';
+import { useReducer, useEffect, useState, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Star, Play, ArrowLeft, Trophy, Loader2, Volume2, VolumeX, WifiOff, RefreshCw } from "lucide-react";
+import { Link } from "wouter";
+import { speakWord, speakText } from "@/lib/tts";
+import { useWordLibrary } from "@/hooks/useWordLibrary";
+import { Confetti } from "@/components/game/Confetti";
+import { AnswerButton } from "@/components/game/AnswerButton";
+import { generateQuestions, calcScore, getStarRating, Question, QuestionOrderMode } from "@/lib/gameUtils";
+import { getStudentRank, submitScore } from "@/lib/firestore";
+import { loadStudent, getOrCreateStudentId } from "@/hooks/useStudent";
+import { AVATAR_EMOJIS } from "@/components/student/NicknameSetup";
+import { startBGM, stopBGM, sfxCorrect, sfxWrong, sfxCountdownTick, sfxCountdownGo, sfxLevelComplete } from "@/lib/soundEngine";
+import { useSoundSettings } from "@/hooks/useSoundSettings";
+import { UserExpBar } from "@/components/gamification/UserExpBar";
+import { AudioButton } from "@/components/ui/AudioButton";
+import { addExp, getUserStats, saveUserStats } from "@/lib/gamification";
+import { recordMistake } from "@/lib/mistakes";
 
-type GamePhase = 'select' | 'countdown' | 'question' | 'results';
-type DifficultyType = 'easy' | 'normal' | 'hard' | 'super' | 'all';
+type GamePhase = "select" | "countdown" | "question" | "results";
+type DifficultyType = "easy" | "normal" | "hard" | "super" | "all";
 
 interface GameState {
   phase: GamePhase;
@@ -37,28 +34,31 @@ interface GameState {
 }
 
 type GameAction =
-  | { type: 'SET_CATEGORY'; payload: string }
-  | { type: 'SET_DIFFICULTY'; payload: DifficultyType }
-  | { type: 'START_COUNTDOWN' }
-  | { type: 'START_GAME'; payload: Question[] }
-  | { type: 'ANSWER'; payload: { selectedIndex: number; isCorrect: boolean; scoreGain: number } }
-  | { type: 'TIME_UP' }
-  | { type: 'NEXT_QUESTION' }
-  | { type: 'RESTART' }
-  | { type: 'CHANGE_TOPIC' };
+  | { type: "SET_CATEGORY"; payload: string }
+  | { type: "SET_DIFFICULTY"; payload: DifficultyType }
+  | { type: "START_COUNTDOWN" }
+  | { type: "START_GAME"; payload: Question[] }
+  | {
+      type: "ANSWER";
+      payload: { selectedIndex: number; isCorrect: boolean; scoreGain: number };
+    }
+  | { type: "TIME_UP" }
+  | { type: "NEXT_QUESTION" }
+  | { type: "RESTART" }
+  | { type: "CHANGE_TOPIC" };
 
 function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
-    case 'SET_CATEGORY':
+    case "SET_CATEGORY":
       return { ...state, category: action.payload };
-    case 'SET_DIFFICULTY':
+    case "SET_DIFFICULTY":
       return { ...state, difficulty: action.payload };
-    case 'START_COUNTDOWN':
-      return { ...state, phase: 'countdown' };
-    case 'START_GAME':
+    case "START_COUNTDOWN":
+      return { ...state, phase: "countdown" };
+    case "START_GAME":
       return {
         ...state,
-        phase: 'question',
+        phase: "question",
         questions: action.payload,
         currentQuestionIndex: 0,
         selectedOptionIndex: null,
@@ -67,7 +67,7 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         correctCount: 0,
         lastScoreGain: 0,
       };
-    case 'ANSWER':
+    case "ANSWER":
       return {
         ...state,
         selectedOptionIndex: action.payload.selectedIndex,
@@ -76,16 +76,16 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         correctCount: action.payload.isCorrect ? state.correctCount + 1 : state.correctCount,
         lastScoreGain: action.payload.scoreGain,
       };
-    case 'TIME_UP':
+    case "TIME_UP":
       return {
         ...state,
         selectedOptionIndex: -1,
         combo: 0,
         lastScoreGain: 0,
       };
-    case 'NEXT_QUESTION':
+    case "NEXT_QUESTION":
       if (state.currentQuestionIndex + 1 >= state.questions.length) {
-        return { ...state, phase: 'results', selectedOptionIndex: null };
+        return { ...state, phase: "results", selectedOptionIndex: null };
       }
       return {
         ...state,
@@ -93,15 +93,15 @@ function gameReducer(state: GameState, action: GameAction): GameState {
         selectedOptionIndex: null,
         lastScoreGain: 0,
       };
-    case 'RESTART':
+    case "RESTART":
       return {
         ...state,
-        phase: 'countdown',
+        phase: "countdown",
       };
-    case 'CHANGE_TOPIC':
+    case "CHANGE_TOPIC":
       return {
         ...state,
-        phase: 'select',
+        phase: "select",
       };
     default:
       return state;
@@ -117,23 +117,27 @@ const DIFFICULTY_COUNTS: Record<DifficultyType, number> = {
 };
 
 const DIFFICULTY_LABELS: Record<DifficultyType, string> = {
-  easy: '簡單 (6題)',
-  normal: '標準 (10題)',
-  hard: '挑戰 (15題)',
-  super: '超強 (30題)',
-  all: '全部單字',
+  easy: "簡單 (6題)",
+  normal: "標準 (10題)",
+  hard: "挑戰 (15題)",
+  super: "超強 (30題)",
+  all: "全部單字",
 };
 
 export default function Game() {
   const { words: allWords, categories, loading, error: wordError } = useWordLibrary();
   const { muted, toggleMute } = useSoundSettings();
 
-  const [orderMode, setOrderMode] = useState<QuestionOrderMode>('newest');
+  const [orderMode, setOrderMode] = useState<QuestionOrderMode>("newest");
   const [pendingIndex, setPendingIndex] = useState<number | null>(null);
+  const [resultRank, setResultRank] = useState<number | null>(null);
+  const [resultHero, setResultHero] = useState<ReturnType<typeof loadStudent>>(null);
 
   // Keep a stable ref to allWords
   const allWordsRef = useRef(allWords);
-  useEffect(() => { allWordsRef.current = allWords; }, [allWords]);
+  useEffect(() => {
+    allWordsRef.current = allWords;
+  }, [allWords]);
 
   // BGM lifecycle
   useEffect(() => {
@@ -142,9 +146,9 @@ export default function Game() {
   }, [muted]);
 
   const [state, dispatch] = useReducer(gameReducer, {
-    phase: 'select',
-    category: '全部',
-    difficulty: 'normal',
+    phase: "select",
+    category: "全部",
+    difficulty: "normal",
     questions: [],
     currentQuestionIndex: 0,
     selectedOptionIndex: null,
@@ -155,7 +159,7 @@ export default function Game() {
   });
 
   const [countdown, setCountdown] = useState<number | null>(null);
-  const [timerWidth, setTimerWidth] = useState('100%');
+  const [timerWidth, setTimerWidth] = useState("100%");
   const timerStartRef = useRef<number>(0);
   const timerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -165,7 +169,7 @@ export default function Game() {
 
   function scrollToNext(ref: React.RefObject<HTMLElement | null>) {
     setTimeout(() => {
-      ref.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      ref.current?.scrollIntoView({ behavior: "smooth", block: "center" });
     }, 120);
   }
 
@@ -178,21 +182,26 @@ export default function Game() {
   }, []);
 
   useEffect(() => {
-    if (state.phase === 'countdown') {
+    if (state.phase === "countdown") {
       sfxCountdownTick();
       setCountdown(3);
-      const timer3 = setTimeout(() => { setCountdown(2); sfxCountdownTick(); }, 1000);
-      const timer2 = setTimeout(() => { setCountdown(1); sfxCountdownTick(); }, 2000);
-      const timer1 = setTimeout(() => { setCountdown(0); sfxCountdownGo(); }, 3000);
+      const timer3 = setTimeout(() => {
+        setCountdown(2);
+        sfxCountdownTick();
+      }, 1000);
+      const timer2 = setTimeout(() => {
+        setCountdown(1);
+        sfxCountdownTick();
+      }, 2000);
+      const timer1 = setTimeout(() => {
+        setCountdown(0);
+        sfxCountdownGo();
+      }, 3000);
       const timerStart = setTimeout(() => {
-        const words = state.category === '全部'
-          ? allWordsRef.current
-          : allWordsRef.current.filter(w => w.category === state.category);
-        const count = state.difficulty === 'all'
-          ? words.length
-          : (DIFFICULTY_COUNTS[state.difficulty] || 10);
+        const words = state.category === "全部" ? allWordsRef.current : allWordsRef.current.filter((w) => w.category === state.category);
+        const count = state.difficulty === "all" ? words.length : DIFFICULTY_COUNTS[state.difficulty] || 10;
         const q = generateQuestions(words, count, orderMode);
-        dispatch({ type: 'START_GAME', payload: q });
+        dispatch({ type: "START_GAME", payload: q });
       }, 4000);
 
       return () => {
@@ -211,23 +220,23 @@ export default function Game() {
   }, [state.currentQuestionIndex, state.phase]);
 
   useEffect(() => {
-    if (state.phase === 'question' && state.selectedOptionIndex === null) {
+    if (state.phase === "question" && state.selectedOptionIndex === null) {
       const q = state.questions[state.currentQuestionIndex];
       // Auto-speak: English for en_to_zh, Chinese for zh_to_en
-      if (q.direction === 'en_to_zh') speakWord(q.word.english);
+      if (q.direction === "en_to_zh") speakWord(q.word.english);
       else speakText(q.word.chinese);
 
-      setTimerWidth('100%');
+      setTimerWidth("100%");
       const transitionTimer = setTimeout(() => {
-        setTimerWidth('0%');
+        setTimerWidth("0%");
       }, 50);
 
       timerStartRef.current = Date.now();
       timerTimeoutRef.current = setTimeout(() => {
-        setTimerWidth('0%');
-        dispatch({ type: 'TIME_UP' });
+        setTimerWidth("0%");
+        dispatch({ type: "TIME_UP" });
         setTimeout(() => {
-          dispatch({ type: 'NEXT_QUESTION' });
+          dispatch({ type: "NEXT_QUESTION" });
         }, 2000);
       }, QUESTION_TIME_MS);
 
@@ -241,34 +250,38 @@ export default function Game() {
 
   // Submit score to Firestore when game ends + play completion SFX
   useEffect(() => {
-    if (state.phase !== 'results' || state.questions.length === 0) return undefined;
+    if (state.phase !== "results" || state.questions.length === 0) return undefined;
     sfxLevelComplete();
     const student = loadStudent();
+    if (!student?.nickname) return undefined;
     const studentId = getOrCreateStudentId();
-    const nickname = student?.nickname || '無名英雄';
-    const avatar = student?.avatar ?? 1;
+    setResultHero(student);
+    setResultRank(null);
     submitScore({
       studentId,
-      nickname,
-      avatar,
+      nickname: student.nickname,
+      avatar: student.avatar,
       score: state.score,
       category: state.category,
       difficulty: state.difficulty,
       correctCount: state.correctCount,
       totalQuestions: state.questions.length,
-    }).catch(() => {
-      // Firebase not configured or network error — silent fallback
-    });
+    })
+      .then(() => getStudentRank(studentId))
+      .then(setResultRank)
+      .catch(() => {
+        // Firebase not configured or network error — silent fallback
+      });
     return undefined;
   }, [state.phase]); // Only trigger when phase changes to 'results'
 
   const handleAnswer = (index: number) => {
     if (state.selectedOptionIndex !== null) return;
-    
+
     if (timerTimeoutRef.current) clearTimeout(timerTimeoutRef.current);
     const timeElapsed = Date.now() - timerStartRef.current;
     const timeLeft = Math.max(0, QUESTION_TIME_MS - timeElapsed);
-    
+
     const percentage = (timeLeft / QUESTION_TIME_MS) * 100;
     setTimerWidth(`${percentage}%`);
 
@@ -285,14 +298,16 @@ export default function Game() {
     speakWord(q.options[index].english);
 
     const scoreGain = isCorrect ? calcScore(timeLeft, QUESTION_TIME_MS, state.combo) : 0;
-    
-    dispatch({ type: 'ANSWER', payload: { selectedIndex: index, isCorrect, scoreGain } });
+
+    dispatch({
+      type: "ANSWER",
+      payload: { selectedIndex: index, isCorrect, scoreGain },
+    });
 
     setTimeout(() => {
-      dispatch({ type: 'NEXT_QUESTION' });
+      dispatch({ type: "NEXT_QUESTION" });
     }, 1500);
   };
-
 
   const handleOptionClick = (index: number) => {
     if (state.selectedOptionIndex !== null) return;
@@ -300,10 +315,10 @@ export default function Game() {
     if (!q) return;
 
     const opt = q.options[index];
-    const optionLabel = q.direction === 'en_to_zh' ? opt.chinese : opt.english;
+    const optionLabel = q.direction === "en_to_zh" ? opt.chinese : opt.english;
 
     // 桌機（支援 hover 的精準指標裝置）：hover 已播放 TTS，點擊直接提交
-    const isDesktop = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+    const isDesktop = window.matchMedia("(hover: hover) and (pointer: fine)").matches;
 
     if (isDesktop) {
       // 桌機：單擊直接確認答案
@@ -323,10 +338,8 @@ export default function Game() {
     }
   };
 
-
   // P0-D: 計算各分類可用單字數
-  const categoryWordCount = (cat: string) =>
-    cat === '全部' ? allWords.length : allWords.filter(w => w.category === cat).length;
+  const categoryWordCount = (cat: string) => (cat === "全部" ? allWords.length : allWords.filter((w) => w.category === cat).length);
 
   const selectedWordCount = categoryWordCount(state.category);
   // 四選一題型最少需要 4 個單字
@@ -341,7 +354,10 @@ export default function Game() {
       <UserExpBar />
 
       {/* 返回按鈕 */}
-      <Link href="/" className="absolute top-4 left-4 sm:top-6 sm:left-6 text-muted-foreground hover:text-foreground transition-colors bg-muted p-3 sm:p-4 rounded-full shadow-sm hover:scale-105 active:scale-95">
+      <Link
+        href="/"
+        className="absolute top-4 left-4 sm:top-6 sm:left-6 text-muted-foreground hover:text-foreground transition-colors bg-muted p-3 sm:p-4 rounded-full shadow-sm hover:scale-105 active:scale-95"
+      >
         <ArrowLeft className="w-6 h-6 sm:w-8 sm:h-8" />
       </Link>
 
@@ -349,7 +365,7 @@ export default function Game() {
       <button
         onClick={toggleMute}
         className="absolute top-4 right-4 sm:top-6 sm:right-6 text-muted-foreground hover:text-foreground transition-colors bg-muted p-3 sm:p-4 rounded-full shadow-sm hover:scale-105 active:scale-95"
-        aria-label={muted ? '開啟音效' : '關閉音效'}
+        aria-label={muted ? "開啟音效" : "關閉音效"}
       >
         {muted ? <VolumeX className="w-6 h-6 sm:w-8 sm:h-8" /> : <Volume2 className="w-6 h-6 sm:w-8 sm:h-8" />}
       </button>
@@ -360,16 +376,17 @@ export default function Game() {
         </div>
       </div>
 
-      <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-primary mb-5 sm:mb-10 tracking-widest drop-shadow-sm">
-        單字大挑戰
-      </h1>
+      <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-primary mb-5 sm:mb-10 tracking-widest drop-shadow-sm">單字大挑戰</h1>
 
       {/* P0-C：Firestore 連線失敗提示 */}
       {wordError && (
         <div className="mb-6 flex items-center gap-3 p-4 bg-destructive/10 border border-destructive/20 rounded-2xl text-destructive text-sm font-bold">
           <WifiOff className="w-5 h-5 shrink-0" />
           <span>無法連線到單字庫，請確認網路連線後重新整理</span>
-          <button onClick={() => window.location.reload()} className="ml-auto flex items-center gap-1 bg-destructive/10 hover:bg-destructive/20 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap">
+          <button
+            onClick={() => window.location.reload()}
+            className="ml-auto flex items-center gap-1 bg-destructive/10 hover:bg-destructive/20 px-3 py-1.5 rounded-xl transition-colors whitespace-nowrap"
+          >
             <RefreshCw className="w-4 h-4" /> 重試
           </button>
         </div>
@@ -389,7 +406,7 @@ export default function Game() {
           選擇主題
         </h2>
         <div className="grid grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3">
-          {categories.map(cat => {
+          {categories.map((cat) => {
             const count = categoryWordCount(cat);
             const tooFew = count < 4;
             return (
@@ -397,25 +414,21 @@ export default function Game() {
                 key={cat}
                 data-testid={`category-btn-${cat}`}
                 onClick={() => {
-                  dispatch({ type: 'SET_CATEGORY', payload: cat });
+                  dispatch({ type: "SET_CATEGORY", payload: cat });
                   scrollToNext(difficultyRef);
                 }}
-                className={`p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl font-black text-sm sm:text-xl border-4 transition-all flex flex-col items-center gap-0.5 ${state.category === cat ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
+                className={`p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl font-black text-sm sm:text-xl border-4 transition-all flex flex-col items-center gap-0.5 ${state.category === cat ? "bg-primary text-primary-foreground border-primary scale-105 shadow-xl -translate-y-1" : "bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5"}`}
               >
                 <span>{cat}</span>
                 {/* P0-D：顯示該分類單字數 */}
-                <span className={`text-[10px] sm:text-xs font-bold opacity-70 ${tooFew && state.category === cat ? 'text-destructive opacity-100' : ''}`}>
-                  {count} 字
-                </span>
+                <span className={`text-[10px] sm:text-xs font-bold opacity-70 ${tooFew && state.category === cat ? "text-destructive opacity-100" : ""}`}>{count} 字</span>
               </button>
             );
           })}
         </div>
         {/* P0-D：選中的分類不足 4 字時提示 */}
         {!loading && !wordError && selectedWordCount < 4 && selectedWordCount > 0 && (
-          <p className="mt-3 text-sm text-destructive font-bold flex items-center gap-2">
-            ＊此主題只有 {selectedWordCount} 個單字，至少需要 4 個才能開始遊戲
-          </p>
+          <p className="mt-3 text-sm text-destructive font-bold flex items-center gap-2">＊此主題只有 {selectedWordCount} 個單字，至少需要 4 個才能開始遊戲</p>
         )}
       </div>
 
@@ -426,15 +439,15 @@ export default function Game() {
           選擇題數
         </h2>
         <div className="grid grid-cols-3 sm:grid-cols-5 gap-2 sm:gap-3">
-          {(['easy', 'normal', 'hard', 'super', 'all'] as const).map(diff => (
+          {(["easy", "normal", "hard", "super", "all"] as const).map((diff) => (
             <button
               key={diff}
               data-testid={`difficulty-${diff}`}
               onClick={() => {
-                dispatch({ type: 'SET_DIFFICULTY', payload: diff });
+                dispatch({ type: "SET_DIFFICULTY", payload: diff });
                 scrollToNext(startBtnRef);
               }}
-              className={`p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl font-black text-xs sm:text-lg border-4 transition-all flex flex-col items-center justify-center gap-1 ${state.difficulty === diff ? 'bg-secondary text-secondary-foreground border-secondary scale-105 shadow-xl -translate-y-1' : 'bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5'}`}
+              className={`p-2.5 sm:p-4 rounded-2xl sm:rounded-3xl font-black text-xs sm:text-lg border-4 transition-all flex flex-col items-center justify-center gap-1 ${state.difficulty === diff ? "bg-secondary text-secondary-foreground border-secondary scale-105 shadow-xl -translate-y-1" : "bg-card text-foreground border-border hover:bg-muted shadow-[0_4px_0_rgba(0,0,0,0.1)] hover:-translate-y-0.5"}`}
             >
               <span>{DIFFICULTY_LABELS[diff]}</span>
             </button>
@@ -450,14 +463,14 @@ export default function Game() {
         </h2>
         <div className="grid grid-cols-3 gap-2 sm:gap-3">
           {[
-            { id: 'newest', label: '🆕 最新單字優先' },
-            { id: 'random', label: '🎲 隨機混合' },
-            { id: 'oldest', label: '📜 依序出題' },
-          ].map(item => (
+            { id: "newest", label: "🆕 最新單字優先" },
+            { id: "random", label: "🎲 隨機混合" },
+            { id: "oldest", label: "📜 依序出題" },
+          ].map((item) => (
             <button
               key={item.id}
               onClick={() => setOrderMode(item.id as QuestionOrderMode)}
-              className={`p-3 rounded-2xl sm:rounded-3xl font-black text-xs sm:text-base border-4 transition-all ${orderMode === item.id ? 'bg-primary text-primary-foreground border-primary scale-105 shadow-lg -translate-y-0.5' : 'bg-card text-foreground border-border hover:bg-muted'}`}
+              className={`p-3 rounded-2xl sm:rounded-3xl font-black text-xs sm:text-base border-4 transition-all ${orderMode === item.id ? "bg-primary text-primary-foreground border-primary scale-105 shadow-lg -translate-y-0.5" : "bg-card text-foreground border-border hover:bg-muted"}`}
             >
               {item.label}
             </button>
@@ -470,7 +483,7 @@ export default function Game() {
         ref={startBtnRef}
         data-testid="start-game"
         disabled={!canStart}
-        onClick={() => dispatch({ type: 'START_COUNTDOWN' })}
+        onClick={() => dispatch({ type: "START_COUNTDOWN" })}
         className="w-full py-5 sm:py-7 bg-green-500 hover:bg-green-600 active:scale-95 active:translate-y-1 text-white rounded-[2rem] sm:rounded-[3rem] text-2xl sm:text-4xl font-black shadow-[0_8px_0_rgba(21,128,61,1)] sm:shadow-[0_10px_0_rgba(21,128,61,1)] transition-all flex items-center justify-center gap-4 sm:gap-6 group hover:-translate-y-1 hover:shadow-[0_12px_0_rgba(21,128,61,1)] disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
       >
         {loading ? (
@@ -506,7 +519,7 @@ export default function Game() {
           transition={{ duration: 0.4 }}
           className="text-[12rem] md:text-[18rem] font-black text-white drop-shadow-[0_20px_20px_rgba(0,0,0,0.3)] tracking-tighter"
         >
-          {countdown === 0 ? '開始！' : countdown}
+          {countdown === 0 ? "開始！" : countdown}
         </motion.div>
       </AnimatePresence>
     </div>
@@ -533,7 +546,7 @@ export default function Game() {
                   exit={{ scale: 0, opacity: 0 }}
                   className="bg-orange-500 text-white px-3 sm:px-6 py-1 sm:py-2 rounded-full font-black text-sm sm:text-xl shadow-lg border-2 border-orange-300 whitespace-nowrap"
                 >
-                  x{state.combo >= 4 ? '2.0' : '1.5'} 連擊！
+                  x{state.combo >= 4 ? "2.0" : "1.5"} 連擊！
                 </motion.div>
               )}
             </AnimatePresence>
@@ -544,11 +557,9 @@ export default function Game() {
             <button
               onClick={toggleMute}
               className="game-mute-button text-white/80 hover:text-white transition-colors bg-white/15 hover:bg-white/25 p-2 sm:p-2.5 rounded-full"
-              aria-label={muted ? '開啟音效' : '關閉音效'}
+              aria-label={muted ? "開啟音效" : "關閉音效"}
             >
-              {muted
-                ? <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" />
-                : <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
+              {muted ? <VolumeX className="w-5 h-5 sm:w-6 sm:h-6" /> : <Volume2 className="w-5 h-5 sm:w-6 sm:h-6" />}
             </button>
           </div>
         </div>
@@ -556,8 +567,10 @@ export default function Game() {
         {/* Word Display */}
         <div className="game-word-section flex flex-col items-center justify-center mb-3 sm:mb-4 relative">
           {/* Direction badge */}
-          <div className={`game-direction-badge mb-2 sm:mb-3 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-black tracking-widest shadow-sm border-2 ${q.direction === 'en_to_zh' ? 'bg-blue-100 text-blue-700 border-blue-200' : 'bg-rose-100 text-rose-700 border-rose-200'}`}>
-            {q.direction === 'en_to_zh' ? '看英文，選中文' : '看中文，選英文'}
+          <div
+            className={`game-direction-badge mb-2 sm:mb-3 px-3 sm:px-6 py-1 sm:py-2 rounded-full text-xs sm:text-sm font-black tracking-widest shadow-sm border-2 ${q.direction === "en_to_zh" ? "bg-blue-100 text-blue-700 border-blue-200" : "bg-rose-100 text-rose-700 border-rose-200"}`}
+          >
+            {q.direction === "en_to_zh" ? "看英文，選中文" : "看中文，選英文"}
           </div>
 
           <div className="game-word-card text-center bg-card rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl border-4 sm:border-8 border-white w-full py-4 sm:py-8 md:py-14 relative overflow-hidden flex flex-col items-center justify-center min-h-[90px] sm:min-h-[140px] md:min-h-[180px]">
@@ -568,34 +581,31 @@ export default function Game() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 className="game-prompt font-black text-foreground drop-shadow-sm px-3 break-words w-full"
-                style={{ fontSize: 'clamp(1.5rem, 10vw, 7rem)', letterSpacing: '0.02em' }}
+                style={{
+                  fontSize: "clamp(1.5rem, 10vw, 7rem)",
+                  letterSpacing: "0.02em",
+                }}
               >
-                {q.direction === 'en_to_zh' ? q.word.english : q.word.chinese}
+                {q.direction === "en_to_zh" ? q.word.english : q.word.chinese}
               </motion.h2>
             </AnimatePresence>
 
             {/* 🔊 重播題目發音按鈕 */}
             <motion.button
-              key={q.word.id + '-speaker'}
+              key={q.word.id + "-speaker"}
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
-              onClick={() =>
-                q.direction === 'en_to_zh'
-                  ? speakWord(q.word.english)
-                  : speakText(q.word.chinese)
-              }
+              onClick={() => (q.direction === "en_to_zh" ? speakWord(q.word.english) : speakText(q.word.chinese))}
               onMouseEnter={() => {
-                if (window.matchMedia('(hover: hover) and (pointer: fine)').matches) {
-                  q.direction === 'en_to_zh'
-                    ? speakWord(q.word.english)
-                    : speakText(q.word.chinese);
+                if (window.matchMedia("(hover: hover) and (pointer: fine)").matches) {
+                  q.direction === "en_to_zh" ? speakWord(q.word.english) : speakText(q.word.chinese);
                 }
               }}
               className="game-replay-button mt-2 sm:mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 text-primary text-xs sm:text-sm font-bold transition-all hover:scale-105 active:scale-95 border border-primary/20"
               title="重新播放發音"
             >
               <Volume2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
-              {q.direction === 'en_to_zh' ? '聽英文' : '聽中文'}
+              {q.direction === "en_to_zh" ? "聽英文" : "聽中文"}
             </motion.button>
 
             <AnimatePresence>
@@ -615,11 +625,11 @@ export default function Game() {
           {/* Timer bar */}
           <div className="game-timer w-full h-3 sm:h-5 bg-card/40 backdrop-blur-sm rounded-full mt-3 sm:mt-5 overflow-hidden shadow-inner border-2 sm:border-4 border-white/30 p-0.5">
             <div
-              className={`h-full rounded-full ${state.selectedOptionIndex !== null ? (state.selectedOptionIndex === q.correctIndex ? 'bg-green-400' : 'bg-red-400') : 'bg-primary'}`}
+              className={`h-full rounded-full ${state.selectedOptionIndex !== null ? (state.selectedOptionIndex === q.correctIndex ? "bg-green-400" : "bg-red-400") : "bg-primary"}`}
               style={{
                 width: timerWidth,
-                transitionDuration: state.selectedOptionIndex !== null ? '0ms' : `${QUESTION_TIME_MS}ms`,
-                transitionTimingFunction: 'linear',
+                transitionDuration: state.selectedOptionIndex !== null ? "0ms" : `${QUESTION_TIME_MS}ms`,
+                transitionTimingFunction: "linear",
               }}
             />
           </div>
@@ -640,7 +650,7 @@ export default function Game() {
               const disabled = state.selectedOptionIndex !== null;
               // en_to_zh: prompt is English, answers are Chinese
               // zh_to_en: prompt is Chinese, answers are English
-              const optionLabel = q.direction === 'en_to_zh' ? opt.chinese : opt.english;
+              const optionLabel = q.direction === "en_to_zh" ? opt.chinese : opt.english;
 
               return (
                 <AnswerButton
@@ -666,7 +676,7 @@ export default function Game() {
 
   const renderResults = () => {
     const stars = getStarRating(state.correctCount, state.questions.length);
-    const messages = { 1: '繼續加油！', 2: '表現不錯！', 3: '太棒了！' };
+    const messages = { 1: "繼續加油！", 2: "表現不錯！", 3: "太棒了！" };
     // EXP calculation: 5 per correct, bonus 20 for perfect
     const expEarned = state.correctCount * 5 + (state.correctCount === state.questions.length ? 20 : 0);
     // Wrong words: questions answered incorrectly
@@ -692,14 +702,9 @@ export default function Game() {
         {/* Stars */}
         <div className="flex justify-center gap-4 mb-8">
           {[1, 2, 3].map((star) => (
-            <motion.div
-              key={star}
-              initial={{ scale: 0, rotate: -45 }}
-              animate={{ scale: 1, rotate: 0 }}
-              transition={{ delay: star * 0.3, type: 'spring', damping: 12 }}
-            >
+            <motion.div key={star} initial={{ scale: 0, rotate: -45 }} animate={{ scale: 1, rotate: 0 }} transition={{ delay: star * 0.3, type: "spring", damping: 12 }}>
               <Star
-                className={`w-20 h-20 sm:w-28 sm:h-28 ${star <= stars ? 'text-yellow-400 fill-yellow-400 drop-shadow-[0_6px_8px_rgba(250,204,21,0.4)]' : 'text-muted stroke-[3px] fill-transparent'}`}
+                className={`w-20 h-20 sm:w-28 sm:h-28 ${star <= stars ? "text-yellow-400 fill-yellow-400 drop-shadow-[0_6px_8px_rgba(250,204,21,0.4)]" : "text-muted stroke-[3px] fill-transparent"}`}
               />
             </motion.div>
           ))}
@@ -708,7 +713,8 @@ export default function Game() {
         {/* Score summary */}
         <div className="space-y-3 mb-6 bg-muted/60 p-6 rounded-[2rem] border-4 border-white/50">
           <div className="text-3xl font-bold text-foreground">
-            總分：<span className="text-primary font-black text-5xl mx-2">{state.score}</span> 分
+            總分：
+            <span className="text-primary font-black text-5xl mx-2">{state.score}</span> 分
           </div>
           <div className="text-xl font-bold text-muted-foreground">
             答對 {state.correctCount} / {state.questions.length} 題
@@ -717,15 +723,33 @@ export default function Game() {
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
-            transition={{ delay: 1.2, type: 'spring' }}
+            transition={{ delay: 1.2, type: "spring" }}
             className="inline-flex items-center gap-2 bg-yellow-100 text-yellow-700 font-black text-lg px-5 py-2 rounded-full border-2 border-yellow-300 mt-2"
           >
             ✨ 獲得 +{expEarned} EXP
           </motion.div>
-          <div className="text-3xl font-black text-secondary mt-3 drop-shadow-sm">
-            {messages[stars]}
-          </div>
+          <div className="text-3xl font-black text-secondary mt-3 drop-shadow-sm">{messages[stars]}</div>
         </div>
+
+        {resultHero && (
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-6 flex items-center gap-4 rounded-[1.5rem] border-2 border-primary/20 bg-primary/5 p-4 text-left"
+            data-testid="game-result-rank"
+          >
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-white text-4xl shadow-sm">
+              {AVATAR_EMOJIS[Math.max(0, Math.min(resultHero.avatar - 1, 7))]}
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xl font-black text-foreground">{resultHero.nickname}</p>
+              <p className="text-sm font-bold text-muted-foreground">{resultRank ? `目前是全站第 ${resultRank} 名！` : "成績已送上英雄榜！"}</p>
+            </div>
+            <Link href="/leaderboard" className="shrink-0 rounded-xl bg-primary px-4 py-2 text-sm font-black text-white hover:bg-primary/90">
+              看排名
+            </Link>
+          </motion.div>
+        )}
 
         {/* Wrong words review panel */}
         {state.correctCount < state.questions.length && (
@@ -736,7 +760,8 @@ export default function Game() {
             className="mb-6 text-left bg-red-50 border-2 border-red-200 rounded-[1.5rem] p-5"
           >
             <h3 className="font-black text-red-700 text-lg mb-3 flex items-center gap-2">
-              ❌ 本次需要加強的單字（{state.questions.length - state.correctCount} 個）
+              ❌ 本次需要加強的單字（
+              {state.questions.length - state.correctCount} 個）
             </h3>
             <div className="flex flex-wrap gap-2">
               {state.questions.slice(0, state.questions.length - state.correctCount).map((q, i) => (
@@ -755,14 +780,14 @@ export default function Game() {
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
           <button
             data-testid="btn-replay"
-            onClick={() => dispatch({ type: 'RESTART' })}
+            onClick={() => dispatch({ type: "RESTART" })}
             className="flex-1 py-5 bg-primary hover:bg-primary/90 text-white rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(147,51,234,1)] active:translate-y-2 active:shadow-none transition-all"
           >
             🔄 再玩一次
           </button>
           <button
             data-testid="btn-change-topic"
-            onClick={() => dispatch({ type: 'CHANGE_TOPIC' })}
+            onClick={() => dispatch({ type: "CHANGE_TOPIC" })}
             className="flex-1 py-5 bg-card border-4 border-border hover:bg-muted text-foreground rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-none transition-all"
           >
             🎯 換個主題
@@ -773,13 +798,15 @@ export default function Game() {
   };
 
   return (
-    <div className={`game-page min-h-[100dvh] pt-16 flex flex-col items-center relative bg-background ${
-      state.phase === 'countdown'
-        ? 'justify-center overflow-hidden'
-        : state.phase === 'question'
-          ? 'justify-start overflow-x-clip'
-          : 'justify-start md:justify-center overflow-y-auto py-4 sm:py-6 md:py-0'
-    }`}>
+    <div
+      className={`game-page min-h-[100dvh] pt-16 flex flex-col items-center relative bg-background ${
+        state.phase === "countdown"
+          ? "justify-center overflow-hidden"
+          : state.phase === "question"
+            ? "justify-start overflow-x-clip"
+            : "justify-start md:justify-center overflow-y-auto py-4 sm:py-6 md:py-0"
+      }`}
+    >
       <style>{`
         @keyframes bg-pan {
           0% { background-position: 0% 50%; }
@@ -813,15 +840,15 @@ export default function Game() {
           .game-answer-hint { display: none; }
         }
       `}</style>
-      <div 
+      <div
         className="absolute inset-0 bg-[linear-gradient(-45deg,#3b82f6,#8b5cf6,#ec4899,#f43f5e,#eab308)] bg-[length:400%_400%] opacity-15 pointer-events-none"
-        style={{ animation: 'bg-pan 20s ease-in-out infinite' }}
+        style={{ animation: "bg-pan 20s ease-in-out infinite" }}
       />
-      
-      {state.phase === 'select' && renderSelect()}
-      {state.phase === 'countdown' && renderCountdown()}
-      {state.phase === 'question' && renderQuestion()}
-      {state.phase === 'results' && renderResults()}
+
+      {state.phase === "select" && renderSelect()}
+      {state.phase === "countdown" && renderCountdown()}
+      {state.phase === "question" && renderQuestion()}
+      {state.phase === "results" && renderResults()}
     </div>
   );
 }

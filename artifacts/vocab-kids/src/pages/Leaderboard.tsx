@@ -2,21 +2,19 @@
  * Leaderboard page — real-time top-10 + personal progress dashboard.
  * Falls back gracefully when Firebase is not configured.
  */
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Trophy, Medal, Star, Flame, Target, Gamepad2, AlertCircle } from 'lucide-react';
-import { useLeaderboard, useStudentProgress } from '@/hooks/useLeaderboard';
-import { useStudent, getOrCreateStudentId } from '@/hooks/useStudent';
-import { NicknameSetup, AVATAR_COLORS, AVATAR_INITIALS } from '@/components/student/NicknameSetup';
-import { isFirebaseConfigured } from '@/lib/firebase';
+import { useState, useEffect } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Trophy, Medal, Star, Flame, Target, Gamepad2, AlertCircle } from "lucide-react";
+import { useLeaderboard, useStudentProgress } from "@/hooks/useLeaderboard";
+import { useStudent, getOrCreateStudentId } from "@/hooks/useStudent";
+import { NicknameSetup, AVATAR_COLORS, AVATAR_INITIALS } from "@/components/student/NicknameSetup";
+import { isFirebaseConfigured } from "@/lib/firebase";
 
-function AvatarBadge({ avatar, nickname, size = 'md' }: { avatar: number; nickname: string; size?: 'sm' | 'md' | 'lg' }) {
+function AvatarBadge({ avatar, nickname, size = "md" }: { avatar: number; nickname: string; size?: "sm" | "md" | "lg" }) {
   const idx = Math.max(0, Math.min(avatar - 1, 7));
-  const sizeClass = size === 'sm' ? 'w-10 h-10 text-base' : size === 'lg' ? 'w-20 h-20 text-3xl' : 'w-14 h-14 text-xl';
+  const sizeClass = size === "sm" ? "w-10 h-10 text-base" : size === "lg" ? "w-20 h-20 text-3xl" : "w-14 h-14 text-xl";
   return (
-    <div className={`${sizeClass} ${AVATAR_COLORS[idx]} rounded-full flex items-center justify-center font-black text-white shadow-sm flex-shrink-0`}>
-      {AVATAR_INITIALS[idx]}
-    </div>
+    <div className={`${sizeClass} ${AVATAR_COLORS[idx]} rounded-full flex items-center justify-center font-black text-white shadow-sm flex-shrink-0`}>{AVATAR_INITIALS[idx]}</div>
   );
 }
 
@@ -33,7 +31,7 @@ export default function Leaderboard() {
     if (!loaded || !loaded.nickname) {
       setShowNicknameSetup(true);
     }
-  }, []);  // only on mount
+  }, []); // only on mount
 
   const myRank = entries.findIndex((e) => e.studentId === student?.id) + 1;
 
@@ -46,6 +44,7 @@ export default function Leaderboard() {
       <NicknameSetup
         open={showNicknameSetup}
         studentId={studentId}
+        initialStudent={student}
         onSave={(s) => {
           setStudent(s);
           setShowNicknameSetup(false);
@@ -56,12 +55,7 @@ export default function Leaderboard() {
       <div className="max-w-3xl mx-auto relative z-10">
         {/* Header */}
         <div className="text-center mb-8">
-          <motion.div
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: 'spring', bounce: 0.5 }}
-            className="inline-block p-4 bg-accent/20 rounded-full mb-4"
-          >
+          <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: "spring", bounce: 0.5 }} className="inline-block p-4 bg-accent/20 rounded-full mb-4">
             <Trophy className="w-12 h-12 text-yellow-500" />
           </motion.div>
           <h1 className="text-4xl md:text-5xl font-bold text-foreground mb-4">單字英雄榜</h1>
@@ -108,7 +102,7 @@ export default function Leaderboard() {
                       exit={{ opacity: 0, x: 20 }}
                       transition={{ delay: index * 0.06 }}
                       className={`flex items-center p-4 border-b border-border last:border-0 transition-colors ${
-                        entry.studentId === student?.id ? 'bg-primary/5 ring-2 ring-inset ring-primary/20' : 'hover:bg-muted/40'
+                        entry.studentId === student?.id ? "bg-primary/5 ring-2 ring-inset ring-primary/20" : "hover:bg-muted/40"
                       }`}
                       data-testid={`leaderboard-row-${index}`}
                     >
@@ -116,9 +110,7 @@ export default function Leaderboard() {
                         {entry.rank === 1 && <Medal className="w-8 h-8 text-yellow-500" />}
                         {entry.rank === 2 && <Medal className="w-8 h-8 text-gray-400" />}
                         {entry.rank === 3 && <Medal className="w-8 h-8 text-amber-600" />}
-                        {entry.rank > 3 && (
-                          <span className="text-xl font-bold text-foreground/40">#{entry.rank}</span>
-                        )}
+                        {entry.rank > 3 && <span className="text-xl font-bold text-foreground/40">#{entry.rank}</span>}
                       </div>
 
                       <div className="flex-1 px-4 flex items-center gap-3 min-w-0">
@@ -127,9 +119,7 @@ export default function Leaderboard() {
                           <p className="font-bold text-foreground truncate">{entry.nickname}</p>
                           <p className="text-xs text-muted-foreground">{entry.gamesPlayed} 場遊戲</p>
                         </div>
-                        {entry.studentId === student?.id && (
-                          <span className="ml-auto text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">我</span>
-                        )}
+                        {entry.studentId === student?.id && <span className="ml-auto text-xs font-bold text-primary bg-primary/10 px-2 py-0.5 rounded-full">我</span>}
                       </div>
 
                       <div className="w-28 flex justify-end items-center gap-1">
@@ -160,9 +150,7 @@ export default function Leaderboard() {
                   <AvatarBadge avatar={student.avatar} nickname={student.nickname} size="lg" />
                   <div>
                     <p className="text-xl font-black text-foreground">{student.nickname}</p>
-                    {myRank > 0 && isFirebaseConfigured && (
-                      <p className="text-sm text-primary font-bold">第 {myRank} 名</p>
-                    )}
+                    {myRank > 0 && isFirebaseConfigured && <p className="text-sm text-primary font-bold">第 {myRank} 名</p>}
                   </div>
                 </div>
 
@@ -172,11 +160,7 @@ export default function Leaderboard() {
                   <StatRow
                     icon={<Target className="w-4 h-4 text-green-500" />}
                     label="答題正確率"
-                    value={
-                      progress && progress.questionsTotal > 0
-                        ? `${Math.round((progress.correctTotal / progress.questionsTotal) * 100)}%`
-                        : '—'
-                    }
+                    value={progress && progress.questionsTotal > 0 ? `${Math.round((progress.correctTotal / progress.questionsTotal) * 100)}%` : "—"}
                   />
                 </div>
 
@@ -245,12 +229,7 @@ function ProgressBar({ label, value, color }: { label: string; value: number; co
         <span className="font-bold text-foreground">{value}%</span>
       </div>
       <div className="h-2 bg-muted rounded-full overflow-hidden">
-        <motion.div
-          initial={{ width: 0 }}
-          animate={{ width: `${value}%` }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-          className={`h-full ${color} rounded-full`}
-        />
+        <motion.div initial={{ width: 0 }} animate={{ width: `${value}%` }} transition={{ duration: 0.8, ease: "easeOut" }} className={`h-full ${color} rounded-full`} />
       </div>
     </div>
   );
@@ -258,9 +237,44 @@ function ProgressBar({ label, value, color }: { label: string; value: number; co
 
 // Demo data shown when Firebase is not configured
 const DEMO_ENTRIES = [
-  { studentId: 'demo1', nickname: '小明', avatar: 1, totalScore: 2540, gamesPlayed: 8, rank: 1 },
-  { studentId: 'demo2', nickname: '小美', avatar: 3, totalScore: 2120, gamesPlayed: 6, rank: 2 },
-  { studentId: 'demo3', nickname: '阿豪', avatar: 7, totalScore: 1890, gamesPlayed: 5, rank: 3 },
-  { studentId: 'demo4', nickname: '小芸', avatar: 4, totalScore: 1450, gamesPlayed: 4, rank: 4 },
-  { studentId: 'demo5', nickname: '小傑', avatar: 5, totalScore: 1200, gamesPlayed: 3, rank: 5 },
+  {
+    studentId: "demo1",
+    nickname: "小明",
+    avatar: 1,
+    totalScore: 2540,
+    gamesPlayed: 8,
+    rank: 1,
+  },
+  {
+    studentId: "demo2",
+    nickname: "小美",
+    avatar: 3,
+    totalScore: 2120,
+    gamesPlayed: 6,
+    rank: 2,
+  },
+  {
+    studentId: "demo3",
+    nickname: "阿豪",
+    avatar: 7,
+    totalScore: 1890,
+    gamesPlayed: 5,
+    rank: 3,
+  },
+  {
+    studentId: "demo4",
+    nickname: "小芸",
+    avatar: 4,
+    totalScore: 1450,
+    gamesPlayed: 4,
+    rank: 4,
+  },
+  {
+    studentId: "demo5",
+    nickname: "小傑",
+    avatar: 5,
+    totalScore: 1200,
+    gamesPlayed: 3,
+    rank: 5,
+  },
 ];

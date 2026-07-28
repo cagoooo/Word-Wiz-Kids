@@ -6,21 +6,8 @@
  *   scores/{auto-id}          — individual game sessions
  *   studentProgress/{studentId} — aggregated stats per student (for leaderboard)
  */
-import {
-  collection,
-  doc,
-  setDoc,
-  addDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  limit,
-  getDocs,
-  serverTimestamp,
-  increment,
-  type Unsubscribe,
-} from 'firebase/firestore';
-import { db, isFirebaseConfigured } from './firebase';
+import { collection, doc, setDoc, addDoc, onSnapshot, query, orderBy, limit, getDocs, serverTimestamp, increment, type Unsubscribe } from "firebase/firestore";
+import { db, isFirebaseConfigured } from "./firebase";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,7 +60,7 @@ export async function submitScore(params: {
   const { studentId, nickname, avatar, score, category, difficulty, correctCount, totalQuestions } = params;
 
   // Write individual game session
-  await addDoc(collection(db, 'scores'), {
+  await addDoc(collection(db, "scores"), {
     studentId,
     nickname,
     avatar,
@@ -86,7 +73,7 @@ export async function submitScore(params: {
   });
 
   // Upsert aggregated progress (merge so existing fields are preserved)
-  const progressRef = doc(db, 'studentProgress', studentId);
+  const progressRef = doc(db, "studentProgress", studentId);
   await setDoc(
     progressRef,
     {
@@ -105,19 +92,13 @@ export async function submitScore(params: {
 
 // ── Real-time leaderboard ─────────────────────────────────────────────────────
 
-export function subscribeLeaderboard(
-  callback: (entries: LeaderboardEntry[]) => void,
-): Unsubscribe {
+export function subscribeLeaderboard(callback: (entries: LeaderboardEntry[]) => void): Unsubscribe {
   if (!isFirebaseConfigured || !db) {
     callback([]);
     return () => {};
   }
 
-  const q = query(
-    collection(db, 'studentProgress'),
-    orderBy('totalScore', 'desc'),
-    limit(10),
-  );
+  const q = query(collection(db, "studentProgress"), orderBy("totalScore", "desc"), limit(10));
 
   return onSnapshot(q, (snap) => {
     const entries: LeaderboardEntry[] = snap.docs.map((docSnap, idx) => {
@@ -137,16 +118,13 @@ export function subscribeLeaderboard(
 
 // ── Student's own progress ────────────────────────────────────────────────────
 
-export function subscribeStudentProgress(
-  studentId: string,
-  callback: (progress: StudentProgress | null) => void,
-): Unsubscribe {
+export function subscribeStudentProgress(studentId: string, callback: (progress: StudentProgress | null) => void): Unsubscribe {
   if (!isFirebaseConfigured || !db) {
     callback(null);
     return () => {};
   }
 
-  const ref = doc(db, 'studentProgress', studentId);
+  const ref = doc(db, "studentProgress", studentId);
   return onSnapshot(ref, (snap) => {
     if (snap.exists()) {
       callback(snap.data() as StudentProgress);
@@ -156,15 +134,22 @@ export function subscribeStudentProgress(
   });
 }
 
+/** 取得學生目前在全站英雄榜的實際名次（不限前 10 名）。 */
+export async function getStudentRank(studentId: string): Promise<number | null> {
+  if (!isFirebaseConfigured || !db) return null;
+
+  const q = query(collection(db, "studentProgress"), orderBy("totalScore", "desc"));
+  const snap = await getDocs(q);
+  const index = snap.docs.findIndex((studentDoc) => studentDoc.id === studentId);
+  return index >= 0 ? index + 1 : null;
+}
+
 // ── Admin: all student progress ───────────────────────────────────────────────
 
 export async function getAllStudentProgress(): Promise<StudentProgress[]> {
   if (!isFirebaseConfigured || !db) return [];
 
-  const q = query(
-    collection(db, 'studentProgress'),
-    orderBy('totalScore', 'desc'),
-  );
+  const q = query(collection(db, "studentProgress"), orderBy("totalScore", "desc"));
   const snap = await getDocs(q);
   return snap.docs.map((d) => d.data() as StudentProgress);
 }

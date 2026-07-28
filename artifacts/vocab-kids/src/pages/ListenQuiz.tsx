@@ -2,19 +2,22 @@
  * P1-C: 聽力填空測驗模式
  * 純音訊播放，訓練「聽→辨」能力
  */
-import { useState, useEffect, useCallback } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Volume2, Play, ArrowLeft, Trophy, RotateCcw, Headphones, Star, Loader2 } from 'lucide-react';
-import { Link } from 'wouter';
-import { speakWord } from '@/lib/tts';
-import { useWordLibrary } from '@/hooks/useWordLibrary';
-import { Word } from '@/data/words';
-import { UserExpBar } from '@/components/gamification/UserExpBar';
-import { sfxCorrect, sfxWrong, sfxLevelComplete } from '@/lib/soundEngine';
-import { addExp } from '@/lib/gamification';
-import { recordMistake } from '@/lib/mistakes';
+import { useState, useEffect, useCallback, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Volume2, Play, ArrowLeft, Trophy, RotateCcw, Headphones, Star, Loader2 } from "lucide-react";
+import { Link } from "wouter";
+import { speakWord } from "@/lib/tts";
+import { useWordLibrary } from "@/hooks/useWordLibrary";
+import { Word } from "@/data/words";
+import { UserExpBar } from "@/components/gamification/UserExpBar";
+import { sfxCorrect, sfxWrong, sfxLevelComplete } from "@/lib/soundEngine";
+import { addExp } from "@/lib/gamification";
+import { recordMistake } from "@/lib/mistakes";
+import { getStudentRank, submitScore } from "@/lib/firestore";
+import { loadStudent } from "@/hooks/useStudent";
+import { AVATAR_EMOJIS } from "@/components/student/NicknameSetup";
 
-type Phase = 'select' | 'playing' | 'results';
+type Phase = "select" | "playing" | "results";
 
 interface ListenQuestion {
   word: Word;
@@ -24,31 +27,45 @@ interface ListenQuestion {
 
 function generateListenQuestions(words: Word[], count: number): ListenQuestion[] {
   const shuffled = [...words].sort(() => Math.random() - 0.5).slice(0, count);
-  return shuffled.map(word => {
-    const others = words.filter(w => w.id !== word.id).sort(() => Math.random() - 0.5).slice(0, 3);
+  return shuffled.map((word) => {
+    const others = words
+      .filter((w) => w.id !== word.id)
+      .sort(() => Math.random() - 0.5)
+      .slice(0, 3);
     const options = [...others, word].sort(() => Math.random() - 0.5);
-    return { word, options, correctIndex: options.findIndex(o => o.id === word.id) };
+    return {
+      word,
+      options,
+      correctIndex: options.findIndex((o) => o.id === word.id),
+    };
   });
 }
 
 export default function ListenQuiz() {
-  const { words: allWords, categories, loading } = useWordLibrary() as unknown as {
+  const {
+    words: allWords,
+    categories,
+    loading,
+  } = useWordLibrary() as unknown as {
     words: Word[];
     categories: string[];
     loading: boolean;
   };
-  const [phase, setPhase] = useState<Phase>('select');
-  const [category, setCategory] = useState('全部');
-  const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
+  const [phase, setPhase] = useState<Phase>("select");
+  const [category, setCategory] = useState("全部");
+  const [difficulty, setDifficulty] = useState<"easy" | "normal" | "hard">("normal");
   const [questions, setQuestions] = useState<ListenQuestion[]>([]);
   const [currentIdx, setCurrentIdx] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
   const [correctCount, setCorrectCount] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [hasPlayed, setHasPlayed] = useState(false);
+  const [resultRank, setResultRank] = useState<number | null>(null);
+  const [resultHero, setResultHero] = useState<ReturnType<typeof loadStudent>>(null);
+  const submittedRef = useRef(false);
 
   const COUNTS: Record<string, number> = { easy: 6, normal: 10, hard: 15 };
-  const filteredWords = category === '全部' ? allWords : allWords.filter(w => w.category === category);
+  const filteredWords = category === "全部" ? allWords : allWords.filter((w) => w.category === category);
   const canStart = filteredWords.length >= 4;
 
   const startGame = () => {
@@ -58,19 +75,21 @@ export default function ListenQuiz() {
     setCorrectCount(0);
     setSelected(null);
     setHasPlayed(false);
-    setPhase('playing');
+    setResultRank(null);
+    submittedRef.current = false;
+    setPhase("playing");
   };
 
   const playCurrentWord = useCallback(() => {
     if (!questions[currentIdx]) return;
     setIsPlaying(true);
     setHasPlayed(true);
-    speakWord(questions[currentIdx].word.english, 'en-US');
+    speakWord(questions[currentIdx].word.english, "en-US");
     setTimeout(() => setIsPlaying(false), 1500);
   }, [questions, currentIdx]);
 
   useEffect(() => {
-    if (phase === 'playing' && questions[currentIdx]) {
+    if (phase === "playing" && questions[currentIdx]) {
       setSelected(null);
       setHasPlayed(false);
       const timer = setTimeout(() => playCurrentWord(), 600);
@@ -79,14 +98,13 @@ export default function ListenQuiz() {
     return undefined;
   }, [currentIdx, phase, playCurrentWord, questions]);
 
-
   const handleAnswer = (idx: number) => {
     if (selected !== null) return;
     setSelected(idx);
     const isCorrect = idx === questions[currentIdx].correctIndex;
     if (isCorrect) {
       sfxCorrect();
-      setCorrectCount(c => c + 1);
+      setCorrectCount((c) => c + 1);
     } else {
       sfxWrong();
       recordMistake(questions[currentIdx].word);
@@ -96,100 +114,115 @@ export default function ListenQuiz() {
         sfxLevelComplete();
         const exp = correctCount * 5 + (isCorrect ? 5 : 0);
         addExp(exp);
-        setPhase('results');
+        setPhase("results");
       } else {
-        setCurrentIdx(i => i + 1);
+        setCurrentIdx((i) => i + 1);
       }
     }, 1600);
   };
 
-  const ANSWER_COLORS = [
-    'from-red-400 to-rose-500',
-    'from-blue-400 to-indigo-500',
-    'from-yellow-400 to-amber-500',
-    'from-green-400 to-emerald-500',
-  ];
+  useEffect(() => {
+    if (phase !== "results" || submittedRef.current || questions.length === 0) return;
+    const student = loadStudent();
+    if (!student?.nickname) return;
 
-  const SLOT_EMOJIS = ['🔴', '🔵', '🟡', '🟢'];
+    submittedRef.current = true;
+    setResultHero(student);
+    submitScore({
+      studentId: student.id,
+      nickname: student.nickname,
+      avatar: student.avatar,
+      score: correctCount * 100,
+      category,
+      difficulty: `listen-${difficulty}`,
+      correctCount,
+      totalQuestions: questions.length,
+    })
+      .then(() => getStudentRank(student.id))
+      .then(setResultRank)
+      .catch(() => {
+        // 離線或排行榜暫時無法使用時，不影響結算畫面。
+      });
+  }, [category, correctCount, difficulty, phase, questions.length]);
 
-  if (loading) return (
-    <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-cyan-50 to-blue-50">
-      <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
-    </div>
-  );
+  const ANSWER_COLORS = ["from-red-400 to-rose-500", "from-blue-400 to-indigo-500", "from-yellow-400 to-amber-500", "from-green-400 to-emerald-500"];
 
-  if (phase === 'select') return (
-    <div className="min-h-[100dvh] bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50 py-4 px-4">
-      <div className="max-w-2xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <Link href="/" className="p-2 rounded-full bg-white shadow hover:scale-105 transition-transform text-muted-foreground">
-            <ArrowLeft className="w-5 h-5" />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
-              <Headphones className="w-6 h-6 text-blue-500" /> 聽力測驗
-            </h1>
-            <p className="text-sm text-muted-foreground">聽聲音，選出正確單字！</p>
-          </div>
-        </div>
-        <UserExpBar />
+  const SLOT_EMOJIS = ["🔴", "🔵", "🟡", "🟢"];
 
-        <div className="mt-6 bg-white rounded-3xl p-6 shadow-lg border border-blue-100 space-y-6">
-          <div>
-            <h2 className="font-black text-lg mb-3">選擇主題</h2>
-            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
-              {['全部', ...categories].map(cat => (
-                <button
-                  key={cat}
-                  onClick={() => setCategory(cat)}
-                  className={`py-2 px-3 rounded-2xl font-bold text-sm border-2 transition-all ${
-                    category === cat
-                      ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-md'
-                      : 'bg-white text-foreground border-border hover:bg-blue-50'
-                  }`}
-                >
-                  {cat}
-                </button>
-              ))}
+  if (loading)
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center bg-gradient-to-br from-cyan-50 to-blue-50">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-500" />
+      </div>
+    );
+
+  if (phase === "select")
+    return (
+      <div className="min-h-[100dvh] bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50 py-4 px-4">
+        <div className="max-w-2xl mx-auto">
+          <div className="flex items-center gap-3 mb-6">
+            <Link href="/" className="p-2 rounded-full bg-white shadow hover:scale-105 transition-transform text-muted-foreground">
+              <ArrowLeft className="w-5 h-5" />
+            </Link>
+            <div>
+              <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
+                <Headphones className="w-6 h-6 text-blue-500" /> 聽力測驗
+              </h1>
+              <p className="text-sm text-muted-foreground">聽聲音，選出正確單字！</p>
             </div>
           </div>
+          <UserExpBar />
 
-          <div>
-            <h2 className="font-black text-lg mb-3">選擇難度</h2>
-            <div className="grid grid-cols-3 gap-3">
-              {(['easy', 'normal', 'hard'] as const).map(d => (
-                <button
-                  key={d}
-                  onClick={() => setDifficulty(d)}
-                  className={`py-3 rounded-2xl font-bold border-2 transition-all text-sm ${
-                    difficulty === d
-                      ? 'bg-blue-500 text-white border-blue-500 scale-105 shadow-md'
-                      : 'bg-white text-foreground border-border hover:bg-blue-50'
-                  }`}
-                >
-                  {d === 'easy' ? '😊 簡單 (6題)' : d === 'normal' ? '🎯 正常 (10題)' : '🔥 挑戰 (15題)'}
-                </button>
-              ))}
+          <div className="mt-6 bg-white rounded-3xl p-6 shadow-lg border border-blue-100 space-y-6">
+            <div>
+              <h2 className="font-black text-lg mb-3">選擇主題</h2>
+              <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
+                {["全部", ...categories].map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setCategory(cat)}
+                    className={`py-2 px-3 rounded-2xl font-bold text-sm border-2 transition-all ${
+                      category === cat ? "bg-blue-500 text-white border-blue-500 scale-105 shadow-md" : "bg-white text-foreground border-border hover:bg-blue-50"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
             </div>
+
+            <div>
+              <h2 className="font-black text-lg mb-3">選擇難度</h2>
+              <div className="grid grid-cols-3 gap-3">
+                {(["easy", "normal", "hard"] as const).map((d) => (
+                  <button
+                    key={d}
+                    onClick={() => setDifficulty(d)}
+                    className={`py-3 rounded-2xl font-bold border-2 transition-all text-sm ${
+                      difficulty === d ? "bg-blue-500 text-white border-blue-500 scale-105 shadow-md" : "bg-white text-foreground border-border hover:bg-blue-50"
+                    }`}
+                  >
+                    {d === "easy" ? "😊 簡單 (6題)" : d === "normal" ? "🎯 正常 (10題)" : "🔥 挑戰 (15題)"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {!canStart && <p className="text-center text-red-500 font-bold text-sm">此主題單字不足 4 個，請選擇其他主題</p>}
+
+            <button
+              onClick={startGame}
+              disabled={!canStart}
+              className="w-full py-5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl font-black text-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+            >
+              🎧 開始聽力測驗
+            </button>
           </div>
-
-          {!canStart && (
-            <p className="text-center text-red-500 font-bold text-sm">此主題單字不足 4 個，請選擇其他主題</p>
-          )}
-
-          <button
-            onClick={startGame}
-            disabled={!canStart}
-            className="w-full py-5 bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-2xl font-black text-xl shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-          >
-            🎧 開始聽力測驗
-          </button>
         </div>
       </div>
-    </div>
-  );
+    );
 
-  if (phase === 'results') {
+  if (phase === "results") {
     const stars = correctCount === questions.length ? 3 : correctCount >= questions.length * 0.7 ? 2 : 1;
     const expEarned = correctCount * 5 + (correctCount === questions.length ? 20 : 0);
     return (
@@ -201,14 +234,30 @@ export default function ListenQuiz() {
         >
           <h1 className="text-4xl font-black mb-6">🎧 聽力結算</h1>
           <div className="flex justify-center gap-3 mb-6">
-            {[1, 2, 3].map(s => (
-              <Star key={s} className={`w-16 h-16 ${s <= stars ? 'text-yellow-400 fill-yellow-400' : 'text-gray-200 fill-gray-200'}`} />
+            {[1, 2, 3].map((s) => (
+              <Star key={s} className={`w-16 h-16 ${s <= stars ? "text-yellow-400 fill-yellow-400" : "text-gray-200 fill-gray-200"}`} />
             ))}
           </div>
           <div className="bg-blue-50 rounded-2xl p-5 mb-6 space-y-2">
-            <p className="text-3xl font-black text-blue-700">答對 {correctCount} / {questions.length} 題</p>
+            <p className="text-3xl font-black text-blue-700">
+              答對 {correctCount} / {questions.length} 題
+            </p>
             <p className="text-lg font-bold text-yellow-600">✨ 獲得 +{expEarned} EXP</p>
           </div>
+          {resultHero && (
+            <div className="mb-6 flex items-center gap-3 rounded-2xl border-2 border-blue-200 bg-blue-50 p-4 text-left" data-testid="listen-result-rank">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white text-3xl shadow-sm">
+                {AVATAR_EMOJIS[Math.max(0, Math.min(resultHero.avatar - 1, 7))]}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-black text-foreground">{resultHero.nickname}</p>
+                <p className="text-sm font-bold text-blue-600">{resultRank ? `英雄榜第 ${resultRank} 名` : "成績已送上英雄榜！"}</p>
+              </div>
+              <Link href="/leaderboard" className="shrink-0 rounded-xl bg-blue-500 px-3 py-2 text-sm font-black text-white">
+                看排名
+              </Link>
+            </div>
+          )}
           <div className="flex gap-3">
             <button
               onClick={startGame}
@@ -237,13 +286,17 @@ export default function ListenQuiz() {
       {/* Progress */}
       <div className="w-full max-w-md">
         <div className="flex justify-between text-white/70 text-sm font-bold mb-2">
-          <span>第 {currentIdx + 1} / {questions.length} 題</span>
+          <span>
+            第 {currentIdx + 1} / {questions.length} 題
+          </span>
           <span>答對 {correctCount} 題</span>
         </div>
         <div className="h-3 bg-white/20 rounded-full overflow-hidden">
           <motion.div
             className="h-full bg-gradient-to-r from-cyan-400 to-blue-400 rounded-full"
-            animate={{ width: `${((currentIdx + 1) / questions.length) * 100}%` }}
+            animate={{
+              width: `${((currentIdx + 1) / questions.length) * 100}%`,
+            }}
             transition={{ duration: 0.5 }}
           />
         </div>
@@ -261,9 +314,7 @@ export default function ListenQuiz() {
           onClick={playCurrentWord}
           whileTap={{ scale: 0.9 }}
           className={`w-32 h-32 rounded-full flex items-center justify-center transition-all shadow-2xl ${
-            isPlaying
-              ? 'bg-gradient-to-br from-cyan-400 to-blue-500 scale-110 animate-pulse'
-              : 'bg-white/20 hover:bg-white/30 hover:scale-105'
+            isPlaying ? "bg-gradient-to-br from-cyan-400 to-blue-500 scale-110 animate-pulse" : "bg-white/20 hover:bg-white/30 hover:scale-105"
           }`}
         >
           {isPlaying ? <Volume2 className="w-16 h-16 text-white" /> : <Play className="w-16 h-16 text-white" />}
@@ -280,10 +331,10 @@ export default function ListenQuiz() {
             const showResult = selected !== null;
             const bgClass = showResult
               ? isCorrectOpt
-                ? 'bg-green-500 border-green-300 scale-105'
+                ? "bg-green-500 border-green-300 scale-105"
                 : selected === idx
-                  ? 'bg-red-500 border-red-300'
-                  : 'bg-white/10 border-white/20 opacity-50'
+                  ? "bg-red-500 border-red-300"
+                  : "bg-white/10 border-white/20 opacity-50"
               : `bg-gradient-to-br ${ANSWER_COLORS[idx]} border-transparent hover:scale-105`;
 
             return (
@@ -305,10 +356,7 @@ export default function ListenQuiz() {
         </AnimatePresence>
       </div>
 
-      <button
-        onClick={playCurrentWord}
-        className="text-white/60 hover:text-white text-sm font-bold flex items-center gap-2 transition-colors"
-      >
+      <button onClick={playCurrentWord} className="text-white/60 hover:text-white text-sm font-bold flex items-center gap-2 transition-colors">
         <Volume2 className="w-4 h-4" /> 重新播放
       </button>
     </div>
