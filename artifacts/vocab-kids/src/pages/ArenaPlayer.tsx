@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Gamepad2, Loader2, Sparkles, Trophy, XCircle } from 'lucide-react';
 import { Link } from 'wouter';
-import { joinArenaRoom, subscribeArenaRoom, submitArenaAnswer, type ArenaRoom } from '@/lib/realtimeArena';
+import { joinArenaRoom, subscribeArenaRoom, subscribeArenaServerTimeOffset, submitArenaAnswer, type ArenaRoom } from '@/lib/realtimeArena';
+import { getArenaTimeState } from '@/lib/arenaScoring';
 import { sfxCorrect, sfxWrong } from '@/lib/soundEngine';
 import { loadStudent } from '@/hooks/useStudent';
 import { AVATAR_COLORS, AVATAR_EMOJIS } from '@/components/student/NicknameSetup';
@@ -34,6 +35,9 @@ export default function ArenaPlayer() {
   const [room, setRoom] = useState<ArenaRoom | null>(null);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [answerResult, setAnswerResult] = useState<boolean | null>(null);
+  const [pointsAwarded, setPointsAwarded] = useState(0);
+  const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
+  const [now, setNow] = useState(Date.now());
   const [joining, setJoining] = useState(false);
   const [error, setError] = useState('');
 
@@ -80,13 +84,30 @@ export default function ArenaPlayer() {
   useEffect(() => {
     setSelectedOption(null);
     setAnswerResult(null);
+    setPointsAwarded(0);
     setError('');
   }, [room?.currentQuestionIndex, room?.status]);
+
+  useEffect(() => {
+    if (!joined) return;
+    return subscribeArenaServerTimeOffset(setServerTimeOffsetMs);
+  }, [joined]);
+
+  useEffect(() => {
+    if (room?.status !== 'question') return;
+    const tick = () => setNow(Date.now());
+    tick();
+    const interval = window.setInterval(tick, 100);
+    return () => window.clearInterval(interval);
+  }, [room?.status, room?.currentQuestionIndex]);
 
   const currentQuestion = room?.questions[room.currentQuestionIndex];
   const currentPlayer = playerId ? room?.players?.[playerId] : undefined;
   const sortedPlayers = Object.values(room?.players ?? {}).sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt);
   const rank = playerId ? sortedPlayers.findIndex((player) => player.id === playerId) + 1 : 0;
+  const timeState = room?.status === 'question'
+    ? getArenaTimeState(room.questionStartedAt, room.questionDurationMs, now + serverTimeOffsetMs)
+    : { remainingMs: 0, remainingSeconds: 0, progressPercent: 0 };
 
   const handleAnswer = async (optionIndex: number) => {
     if (!room || selectedOption !== null || !playerId) return;
@@ -95,6 +116,7 @@ export default function ArenaPlayer() {
     try {
       const result = await submitArenaAnswer(pin, playerId, optionIndex);
       setAnswerResult(result.isCorrect);
+      setPointsAwarded(result.pointsAwarded);
       if (result.isCorrect) sfxCorrect();
       else sfxWrong();
     } catch (answerError) {
@@ -132,10 +154,25 @@ export default function ArenaPlayer() {
 
       {room.status === 'question' && currentQuestion && (
         <div className="w-full max-w-md text-center">
-          <div className="mb-5 rounded-2xl border border-border bg-card p-4 shadow-sm"><div className="mb-1 flex items-center justify-between text-xs font-bold text-muted-foreground"><span>第 {room.currentQuestionIndex + 1} / {room.questions.length} 題</span><span>{currentPlayer?.score ?? 0} 分</span></div><h3 className="text-3xl font-black text-primary">{currentQuestion.direction === 'en_to_zh' ? currentQuestion.word.english : currentQuestion.word.chinese}</h3></div>
-          <div className="grid grid-cols-2 gap-3">{currentQuestion.options.map((option, index) => { const selected = selectedOption === index; return <button key={option.id} onClick={() => handleAnswer(index)} disabled={selectedOption !== null} className={`relative flex min-h-28 flex-col items-center justify-center rounded-2xl p-3 text-white shadow-xl transition active:scale-95 disabled:cursor-default ${['bg-rose-500','bg-blue-500','bg-amber-500','bg-emerald-500'][index]} ${selected ? 'ring-4 ring-white scale-[1.03]' : ''}`}><span className="mb-1 text-3xl font-black">{['▲','◆','●','■'][index]}</span><span className="break-words text-lg font-black leading-tight">{currentQuestion.direction === 'en_to_zh' ? option.chinese : option.english}</span>{selected && answerResult !== null && <span className="absolute right-2 top-2">{answerResult ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}</span>}</button>; })}</div>
+          <div className="mb-3 overflow-hidden rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-2 flex items-center justify-between text-xs font-bold text-muted-foreground"><span>第 {room.currentQuestionIndex + 1} / {room.questions.length} 題</span><span>{currentPlayer?.score ?? 0} 分</span></div>
+            <div className="mb-3 flex items-center gap-3">
+              <div className="h-3 flex-1 overflow-hidden rounded-full bg-muted" role="progressbar" aria-label="剩餘作答時間" aria-valuemin={0} aria-valuemax={room.questionDurationMs} aria-valuenow={Math.round(timeState.remainingMs)} data-testid="arena-time-progress">
+                <motion.div
+                  className={`h-full rounded-full ${timeState.progressPercent > 60 ? 'bg-emerald-500' : timeState.progressPercent > 30 ? 'bg-amber-500' : 'bg-rose-500'}`}
+                  animate={{ width: `${timeState.progressPercent}%` }}
+                  transition={{ duration: 0.1, ease: 'linear' }}
+                />
+              </div>
+              <span className={`min-w-12 rounded-xl px-2 py-1 text-lg font-black text-white ${timeState.remainingSeconds <= 5 ? 'animate-pulse bg-rose-500' : 'bg-primary'}`} data-testid="arena-time-seconds">{timeState.remainingSeconds}s</span>
+            </div>
+            <h3 className="text-3xl font-black text-primary">{currentQuestion.direction === 'en_to_zh' ? currentQuestion.word.english : currentQuestion.word.chinese}</h3>
+            <p className="mt-2 text-xs font-bold text-muted-foreground">答得越快，速度加成越高！</p>
+          </div>
+          <div className="grid grid-cols-2 gap-3">{currentQuestion.options.map((option, index) => { const selected = selectedOption === index; return <button key={option.id} onClick={() => handleAnswer(index)} disabled={selectedOption !== null || timeState.remainingMs <= 0} className={`relative flex min-h-28 flex-col items-center justify-center rounded-2xl p-3 text-white shadow-xl transition active:scale-95 disabled:cursor-default disabled:opacity-70 ${['bg-rose-500','bg-blue-500','bg-amber-500','bg-emerald-500'][index]} ${selected ? 'ring-4 ring-white scale-[1.03]' : ''}`}><span className="mb-1 text-3xl font-black">{['▲','◆','●','■'][index]}</span><span className="break-words text-lg font-black leading-tight">{currentQuestion.direction === 'en_to_zh' ? option.chinese : option.english}</span>{selected && answerResult !== null && <span className="absolute right-2 top-2">{answerResult ? <CheckCircle2 className="h-6 w-6" /> : <XCircle className="h-6 w-6" />}</span>}</button>; })}</div>
+          {timeState.remainingMs <= 0 && selectedOption === null && <p className="mt-4 rounded-xl bg-rose-500/10 p-3 text-sm font-black text-rose-600">時間到！等待本題排名…</p>}
           {selectedOption !== null && answerResult === null && <p className="mt-4 flex items-center justify-center gap-2 text-sm font-bold text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin" /> 送出答案中…</p>}
-          {answerResult !== null && <p className={`mt-4 text-lg font-black ${answerResult ? 'text-emerald-600' : 'text-rose-600'}`}>{answerResult ? '✅ 答對了！獲得 100 分' : '❌ 再接再厲！'}</p>}
+          {answerResult !== null && <p className={`mt-4 text-lg font-black ${answerResult ? 'text-emerald-600' : 'text-rose-600'}`}>{answerResult ? `✅ 答對了！獲得 ${pointsAwarded} 分（含速度加成）` : '❌ 再接再厲！'}</p>}
           {error && <p className="mt-3 rounded-xl bg-destructive/10 p-3 text-sm font-bold text-destructive">{error}</p>}
         </div>
       )}

@@ -4,6 +4,7 @@ import { ensureAnonymousAuth, isFirebaseConfigured, rtdb } from '@/lib/firebase'
 import { get, onValue, ref, runTransaction, serverTimestamp, set, update } from 'firebase/database';
 import { generateQuestions, type QuestionDirection } from '@/lib/gameUtils';
 import type { Word } from '@/data/words';
+import { calculateArenaAnswerPoints } from '@/lib/arenaScoring';
 
 export interface ArenaWord {
   id: string;
@@ -51,6 +52,7 @@ export interface ArenaRoom {
 const ROOM_TTL_MS = 6 * 60 * 60 * 1000;
 export const ARENA_QUESTION_DURATION_MS = 15_000;
 export const ARENA_HOST_SESSION_KEY = 'word-wiz-arena-host-pin';
+let arenaServerTimeOffsetMs = 0;
 
 export function getArenaErrorMessage(error: unknown, fallback = '即時對戰服務暫時無法使用，請稍後再試。'): string {
   const message = error instanceof Error ? error.message : '';
@@ -194,6 +196,16 @@ export function subscribeArenaRoom(
   };
 }
 
+/** Synchronize countdowns and answer timestamps with Firebase server time. */
+export function subscribeArenaServerTimeOffset(onUpdate: (offsetMs: number) => void): () => void {
+  const database = requireArenaDatabase();
+  return onValue(ref(database, '.info/serverTimeOffset'), (snapshot) => {
+    const offset = typeof snapshot.val() === 'number' ? snapshot.val() : 0;
+    arenaServerTimeOffsetMs = offset;
+    onUpdate(offset);
+  });
+}
+
 export async function startArenaQuestion(pin: string, questionIndex: number): Promise<void> {
   const database = requireArenaDatabase();
   await ensureAnonymousAuth();
@@ -218,7 +230,7 @@ export async function submitArenaAnswer(
   pin: string,
   playerId: string,
   optionIndex: number,
-): Promise<{ isCorrect: boolean; score: number }> {
+): Promise<{ isCorrect: boolean; score: number; pointsAwarded: number }> {
   const database = requireArenaDatabase();
   const user = await ensureAnonymousAuth();
   if (user.uid !== playerId) throw new Error('玩家身分已失效，請重新加入');
@@ -230,6 +242,11 @@ export async function submitArenaAnswer(
   const question = room.questions[room.currentQuestionIndex];
   if (!question || optionIndex < 0 || optionIndex >= question.options.length) throw new Error('答案選項無效');
   const isCorrect = optionIndex === question.correctIndex;
+  const answeredAt = Date.now() + arenaServerTimeOffsetMs;
+  if (answeredAt > room.questionStartedAt + room.questionDurationMs) throw new Error('本題作答時間已結束');
+  const pointsAwarded = isCorrect
+    ? calculateArenaAnswerPoints(room.questionStartedAt, room.questionDurationMs, answeredAt)
+    : 0;
 
   const result = await runTransaction(
     ref(database, `arena_rooms/${pin}/players/${playerId}`),
@@ -240,13 +257,13 @@ export async function submitArenaAnswer(
         answerQuestionIndex: room.currentQuestionIndex,
         currentAnswer: optionIndex,
         isCorrect,
-        answeredAt: Date.now(),
-        score: player.score + (isCorrect ? 100 : 0),
+        answeredAt,
+        score: player.score + pointsAwarded,
       };
     },
   );
 
   if (!result.committed) throw new Error('這一題已經作答過了');
   const updatedPlayer = result.snapshot.val() as PlayerState;
-  return { isCorrect, score: updatedPlayer.score };
+  return { isCorrect, score: updatedPlayer.score, pointsAwarded };
 }

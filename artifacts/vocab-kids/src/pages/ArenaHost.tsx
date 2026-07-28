@@ -6,6 +6,7 @@ import {
   createArenaRoom,
   ARENA_HOST_SESSION_KEY,
   getArenaErrorMessage,
+  subscribeArenaServerTimeOffset,
   startArenaQuestion,
   subscribeArenaRoom,
   updateArenaStatus,
@@ -23,6 +24,7 @@ export default function ArenaHost() {
   const [pin, setPin] = useState<string | null>(() => sessionStorage.getItem(ARENA_HOST_SESSION_KEY));
   const [room, setRoom] = useState<ArenaRoom | null>(null);
   const [timer, setTimer] = useState(15);
+  const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
   const timerTransitionedRef = useRef(false);
@@ -32,6 +34,11 @@ export default function ArenaHost() {
     [category, words],
   );
   const canCreate = categoryWords.length >= 4 && !loading && !creating;
+
+  useEffect(() => {
+    if (!pin) return;
+    return subscribeArenaServerTimeOffset(setServerTimeOffsetMs);
+  }, [pin]);
 
   useEffect(() => {
     if (!pin) return;
@@ -58,7 +65,7 @@ export default function ArenaHost() {
     const tick = () => {
       const remaining = Math.max(
         0,
-        Math.ceil((room.questionStartedAt + room.questionDurationMs - Date.now()) / 1000),
+        Math.ceil((room.questionStartedAt + room.questionDurationMs - (Date.now() + serverTimeOffsetMs)) / 1000),
       );
       setTimer(remaining);
       if (remaining === 0 && !timerTransitionedRef.current) {
@@ -72,7 +79,7 @@ export default function ArenaHost() {
     tick();
     const interval = window.setInterval(tick, 250);
     return () => window.clearInterval(interval);
-  }, [pin, room?.status, room?.currentQuestionIndex, room?.questionStartedAt, room?.questionDurationMs]);
+  }, [pin, room?.status, room?.currentQuestionIndex, room?.questionStartedAt, room?.questionDurationMs, serverTimeOffsetMs]);
 
   const handleCreateRoom = async () => {
     setCreating(true);
