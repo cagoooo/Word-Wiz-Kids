@@ -3,16 +3,17 @@
  * Lists all Firestore words, allows inline edit and delete.
  * All text in Traditional Chinese. No emojis.
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Trash2, Edit3, Save, X, Plus, BookOpen, AlertCircle, RefreshCw, Upload, Download, FileSpreadsheet } from 'lucide-react';
-import { getAllWords, updateWord, deleteWord, addWord, type FirestoreWord } from '@/lib/firestoreWords';
+import { Search, Trash2, Edit3, Save, X, Plus, BookOpen, AlertCircle, RefreshCw, Upload, Download, FileSpreadsheet, ShieldCheck } from 'lucide-react';
+import { getAllWords, updateWord, deleteWord, addWord, importWordsWithQuality, type FirestoreWord } from '@/lib/firestoreWords';
 import { isFirebaseConfigured } from '@/lib/firebase';
 import { MOCK_WORDS } from '@/data/words';
 import { AudioButton } from '@/components/ui/AudioButton';
-import { parseCSV, exportToCSV, downloadSampleCSV } from '@/lib/csvHelper';
+import { parseCSV, exportToCSV, downloadSampleCSV, type WordCSVRow } from '@/lib/csvHelper';
+import { analyzeWordCandidates, findExistingDuplicateGroups, WORD_CATEGORIES, type WordConflictStrategy, type WordQualityPlan } from '@/lib/wordQuality';
 
-const CATEGORIES = ['全部', '動物', '水果', '顏色', '數字', '食物', '交通', '家庭', '身體', '學校', '其他'];
+const CATEGORIES = ['全部', ...WORD_CATEGORIES];
 
 interface EditState {
   english: string;
@@ -32,6 +33,9 @@ export function WordLibrary() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [addState, setAddState] = useState<EditState>({ english: '', chinese: '', phonetic: '', category: '其他' });
   const [saving, setSaving] = useState(false);
+  const [importPreview, setImportPreview] = useState<{ fileName: string; rows: WordCSVRow[]; plan: WordQualityPlan } | null>(null);
+  const [importStrategy, setImportStrategy] = useState<WordConflictStrategy>('skip');
+  const [showQualityScan, setShowQualityScan] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -49,6 +53,7 @@ export function WordLibrary() {
   useEffect(() => { load(); }, []);
 
   const displayWords = isFirebaseConfigured ? words : MOCK_WORDS.map((w) => ({ ...w })) as unknown as FirestoreWord[];
+  const duplicateGroups = useMemo(() => findExistingDuplicateGroups(displayWords), [displayWords]);
 
   const filtered = displayWords.filter((w) => {
     const matchSearch = !search || w.english.includes(search.toLowerCase()) || w.chinese.includes(search);
@@ -111,23 +116,22 @@ export function WordLibrary() {
       alert('未偵測到有效的單字資料。請檢查 CSV 檔案格式。');
       return;
     }
+    setImportPreview({ fileName: file.name, rows: parsed, plan: analyzeWordCandidates(parsed, displayWords) });
+    e.target.value = '';
+  };
 
-    if (!confirm(`成功解析 ${parsed.length} 個單字，確定要匯入單字庫嗎？`)) return;
-
+  const handleConfirmCSVImport = async () => {
+    if (!importPreview || !isFirebaseConfigured) return;
     setSaving(true);
     try {
-      if (isFirebaseConfigured) {
-        for (const w of parsed) {
-          await addWord({ english: w.english, chinese: w.chinese, phonetic: w.phonetic || '', category: w.category || '其他' });
-        }
-        await load();
-      }
-      alert(`已成功將 ${parsed.length} 個單字寫入單字庫！`);
+      const result = await importWordsWithQuality(importPreview.rows, importStrategy);
+      await load();
+      setImportPreview(null);
+      alert(`匯入完成：新增 ${result.addedWords.length} 個、更新 ${result.updatedCount} 個，其他重複或無效資料已略過。`);
     } catch (err) {
       alert('匯入失敗：' + (err instanceof Error ? err.message : '未知錯誤'));
     } finally {
       setSaving(false);
-      e.target.value = '';
     }
   };
 
@@ -187,6 +191,15 @@ export function WordLibrary() {
           </button>
 
           <button
+            onClick={() => setShowQualityScan((value) => !value)}
+            className="flex items-center gap-1.5 px-3 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-2xl font-bold text-xs transition-colors shrink-0"
+            title="掃描現有單字庫中的重複英文"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            品質掃描
+          </button>
+
+          <button
             onClick={load}
             className="p-3 bg-muted hover:bg-muted/70 rounded-2xl transition-colors"
             title="重新整理"
@@ -207,6 +220,46 @@ export function WordLibrary() {
           )}
         </div>
       </div>
+
+      {importPreview && (
+        <div className="rounded-2xl border-2 border-primary/20 bg-primary/5 p-4 space-y-4" data-testid="csv-import-preview">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h3 className="font-black text-foreground">CSV 匯入預覽：{importPreview.fileName}</h3>
+              <p className="text-sm text-muted-foreground">
+                新增 {importPreview.plan.summary.new} · 完全重複 {importPreview.plan.summary.exact_duplicate} · 衝突 {importPreview.plan.summary.conflict} · 批內重複 {importPreview.plan.summary.batch_duplicate} · 無效 {importPreview.plan.summary.invalid}
+              </p>
+            </div>
+            <select value={importStrategy} onChange={(event) => setImportStrategy(event.target.value as WordConflictStrategy)} className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold">
+              <option value="skip">衝突時略過</option>
+              <option value="merge">衝突時合併缺少欄位</option>
+              <option value="overwrite">衝突時以匯入資料覆蓋</option>
+            </select>
+          </div>
+          <div className="max-h-52 overflow-y-auto rounded-xl border border-border bg-card divide-y divide-border">
+            {importPreview.plan.items.map((item) => (
+              <div key={`${item.index}-${item.candidate.english}`} className="grid grid-cols-[1fr_1fr_auto] gap-2 p-2 text-xs">
+                <span className="font-bold">{item.candidate.english || '（缺少英文）'}</span>
+                <span>{item.candidate.chinese || '（缺少中文）'}</span>
+                <span className={item.status === 'new' ? 'text-emerald-600' : item.status === 'invalid' ? 'text-destructive' : 'text-amber-600'}>{item.message}</span>
+              </div>
+            ))}
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={() => setImportPreview(null)} className="flex-1 rounded-xl bg-muted px-4 py-3 font-bold">取消</button>
+            <button type="button" onClick={handleConfirmCSVImport} disabled={saving || importPreview.plan.summary.new + importPreview.plan.summary.conflict === 0} className="flex-[2] rounded-xl bg-primary px-4 py-3 font-black text-white disabled:opacity-40">
+              {saving ? '寫入中…' : '確認套用品質閘門並匯入'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showQualityScan && (
+        <div className={`rounded-2xl border p-4 ${duplicateGroups.length === 0 ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-amber-300 bg-amber-50 text-amber-900'}`} data-testid="word-quality-scan">
+          <p className="font-black">{duplicateGroups.length === 0 ? '品質掃描通過：目前沒有重複英文單字。' : `找到 ${duplicateGroups.length} 組重複英文，請保留正確項目並刪除其餘資料。`}</p>
+          {duplicateGroups.map((group) => <p key={group[0].id} className="mt-2 text-sm">{group[0].english}：{group.map((word) => word.chinese).join('／')}</p>)}
+        </div>
+      )}
 
       {/* Category filter */}
       <div className="flex gap-2 overflow-x-auto pb-1">

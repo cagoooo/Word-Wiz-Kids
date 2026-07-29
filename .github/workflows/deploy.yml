@@ -13,24 +13,30 @@ jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository 📥
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup pnpm 📦
+      - name: Setup pnpm
         uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10.33.0
 
-      - name: Setup Node.js 🟢
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: 'pnpm'
+          cache: pnpm
 
-      - name: Install dependencies 🛠️
-        run: pnpm install --no-frozen-lockfile
+      - name: Setup Java for Firebase rules tests
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
 
-      - name: Inject Secrets into .env 🔑
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Inject secrets into environment file
         run: |
           cat << 'EOF' > ./artifacts/vocab-kids/.env
           VITE_FIREBASE_API_KEY=${{ secrets.VITE_FIREBASE_API_KEY }}
@@ -43,16 +49,20 @@ jobs:
           VITE_GEMINI_API_KEY=${{ secrets.VITE_GEMINI_API_KEY }}
           EOF
 
-      - name: Generate stable release version 🏷️
+      - name: Generate stable release version
         run: |
-          # 同一 commit 重新執行 workflow 時版本必須保持不變，避免產生假 SW 更新。
-          # run number 可排序，讓前端能拒絕 CDN 暫時回送的舊版 sw.js。
           BUILD_VERSION="${GITHUB_RUN_NUMBER}-${GITHUB_SHA::12}"
           echo "BUILD_VERSION=${BUILD_VERSION}" >> "$GITHUB_ENV"
           echo "VITE_BUILD_VERSION=${BUILD_VERSION}" >> "$GITHUB_ENV"
 
-      - name: Build project 🏗️
-        run: pnpm --filter ./artifacts/vocab-kids build
+      - name: Run unit tests
+        run: pnpm --filter @workspace/vocab-kids run test:unit
+
+      - name: Verify Firebase rules and client schema
+        run: pnpm --filter @workspace/vocab-kids run test:rules
+
+      - name: Build project
+        run: pnpm --filter @workspace/vocab-kids run build
         env:
           VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
           VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
@@ -63,7 +73,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_GEMINI_API_KEY: ${{ secrets.VITE_GEMINI_API_KEY }}
 
-      - name: Inject build version into PWA files 🔄
+      - name: Inject build version into PWA files
         run: |
           sed -i "s/__BUILD_VERSION__/${BUILD_VERSION}/g" ./artifacts/vocab-kids/dist/public/sw.js
           sed -i "s/__BUILD_VERSION__/${BUILD_VERSION}/g" ./artifacts/vocab-kids/dist/public/version.json
@@ -84,7 +94,7 @@ jobs:
             exit 1
           fi
 
-      - name: Deploy to GitHub Pages 🚀
+      - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

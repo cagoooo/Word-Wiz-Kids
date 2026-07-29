@@ -1,0 +1,30 @@
+name: Quality checks
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm --filter @workspace/vocab-kids run test:unit
+      - run: pnpm --filter @workspace/vocab-kids run test:rules
+      - run: pnpm --filter @workspace/vocab-kids run build
+      - run: pnpm --filter @workspace/vocab-kids exec playwright install --with-deps chromium
+      - run: pnpm --filter @workspace/vocab-kids run test:e2e

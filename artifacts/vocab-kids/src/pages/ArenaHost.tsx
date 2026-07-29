@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowLeft, ArrowRight, Gamepad2, Loader2, Sparkles, Trophy, Users, WifiOff } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Gamepad2, Loader2, Sparkles, Trophy, UserMinus, Users, WifiOff } from 'lucide-react';
 import { Link } from 'wouter';
 import {
   createArenaRoom,
   ARENA_HOST_SESSION_KEY,
   getArenaErrorMessage,
+  removeArenaPlayer,
+  skipArenaPlayersForQuestion,
   subscribeArenaServerTimeOffset,
   startArenaQuestion,
   subscribeArenaRoom,
   updateArenaStatus,
   type ArenaRoom,
 } from '@/lib/realtimeArena';
+import { getArenaQuestionRoster, isArenaPlayerActive } from '@/lib/arenaPresence';
 import { AVATAR_EMOJIS } from '@/components/student/NicknameSetup';
 import { AudioButton } from '@/components/ui/AudioButton';
 import { sfxLevelComplete, startBGM, stopBGM } from '@/lib/soundEngine';
@@ -29,6 +32,7 @@ export default function ArenaHost() {
   const [serverTimeOffsetMs, setServerTimeOffsetMs] = useState(0);
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState('');
+  const [presenceNow, setPresenceNow] = useState(Date.now());
   const timerTransitionedRef = useRef(false);
 
   useEffect(() => {
@@ -69,9 +73,16 @@ export default function ArenaHost() {
   const players = Object.values(room?.players ?? {});
   const sortedPlayers = [...players].sort((a, b) => b.score - a.score || a.joinedAt - b.joinedAt);
   const currentQuestion = room?.questions[room.currentQuestionIndex];
-  const answeredCount = room
-    ? players.filter((player) => player.answerQuestionIndex === room.currentQuestionIndex).length
-    : 0;
+  const roster = getArenaQuestionRoster(players, room?.currentQuestionIndex ?? 0, presenceNow);
+  const answeredCount = roster.answeredPlayers.length;
+  const activePlayers = players.filter((player) => isArenaPlayerActive(player, presenceNow));
+  const offlinePlayers = players.filter((player) => player.online === false);
+
+  useEffect(() => {
+    if (!room || room.status === 'finished') return;
+    const interval = window.setInterval(() => setPresenceNow(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [room?.status]);
 
   useEffect(() => {
     if (!pin || !room || room.status !== 'question') return;
@@ -100,8 +111,7 @@ export default function ArenaHost() {
       !pin
       || !room
       || room.status !== 'question'
-      || players.length === 0
-      || answeredCount < players.length
+      || !roster.allAnswered
       || timerTransitionedRef.current
     ) return;
 
@@ -110,7 +120,25 @@ export default function ArenaHost() {
       timerTransitionedRef.current = false;
       setError('全班都已作答，但無法結束本題，請再試一次');
     });
-  }, [pin, room?.status, room?.currentQuestionIndex, answeredCount, players.length]);
+  }, [pin, room?.status, room?.currentQuestionIndex, roster.allAnswered]);
+
+  const handleRemovePlayer = async (playerId: string) => {
+    if (!pin) return;
+    try {
+      await removeArenaPlayer(pin, playerId);
+    } catch (removeError) {
+      setError(getArenaErrorMessage(removeError, '無法移除玩家'));
+    }
+  };
+
+  const handleSkipOfflinePlayers = async () => {
+    if (!pin || !room || offlinePlayers.length === 0) return;
+    try {
+      await skipArenaPlayersForQuestion(pin, offlinePlayers.map((player) => player.id), room.currentQuestionIndex);
+    } catch (skipError) {
+      setError(getArenaErrorMessage(skipError, '無法略過離線玩家'));
+    }
+  };
 
   const handleCreateRoom = async () => {
     setCreating(true);
@@ -201,17 +229,18 @@ export default function ArenaHost() {
           <div className="mb-5 flex items-center justify-between"><Link href="/" className="rounded-2xl bg-muted p-2.5 text-muted-foreground"><ArrowLeft className="h-5 w-5" /></Link><span className="flex items-center gap-1.5 rounded-full bg-primary/10 px-4 py-1.5 text-sm font-black text-primary"><Gamepad2 className="h-4 w-4" /> 全班即時對戰</span></div>
           <p className="mb-2 text-sm font-bold text-muted-foreground">請學生進入「全班對戰」並輸入 PIN</p>
           <div className="mb-4 inline-block rounded-3xl bg-gradient-to-tr from-purple-600 to-indigo-600 px-8 py-5 text-5xl sm:text-6xl font-black tracking-[0.18em] text-white shadow-xl">{pin}</div>
-          <div className="mb-6 flex items-center justify-center gap-2 text-sm font-bold text-muted-foreground"><Users className="h-4 w-4 text-emerald-500" /> 已加入 {players.length} 人 · {room.questions.length} 題</div>
+          <div className="mb-6 flex items-center justify-center gap-2 text-sm font-bold text-muted-foreground"><Users className="h-4 w-4 text-emerald-500" /> 在線 {activePlayers.length}／已加入 {players.length} 人 · {room.questions.length} 題</div>
           <div className="mb-7 flex min-h-[150px] flex-wrap items-center justify-center gap-3 rounded-2xl border border-border bg-muted/50 p-5">
-            {players.length === 0 ? <p className="text-sm font-bold text-muted-foreground">等待學生輸入 PIN 加入…</p> : players.map((player) => <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} key={player.id} className="flex items-center gap-2 rounded-2xl border border-border bg-card px-4 py-2 shadow-sm"><span className="text-2xl">{AVATAR_EMOJIS[Math.max(0, Math.min(player.avatar - 1, 7))]}</span><span className="font-bold text-foreground">{player.nickname}</span></motion.div>)}
+            {players.length === 0 ? <p className="text-sm font-bold text-muted-foreground">等待學生輸入 PIN 加入…</p> : players.map((player) => <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} key={player.id} className={`flex items-center gap-2 rounded-2xl border px-4 py-2 shadow-sm ${player.online === false ? 'border-amber-300 bg-amber-50 opacity-75' : 'border-border bg-card'}`}><span className="text-2xl">{AVATAR_EMOJIS[Math.max(0, Math.min(player.avatar - 1, 7))]}</span><span className="font-bold text-foreground">{player.nickname}</span><span className={`h-2.5 w-2.5 rounded-full ${player.online === false ? 'bg-amber-500' : 'bg-emerald-500'}`} title={player.online === false ? '離線' : '在線'} />{player.online === false && <button type="button" onClick={() => handleRemovePlayer(player.id)} className="ml-1 rounded-lg p-1 text-destructive hover:bg-destructive/10" title="移除離線玩家"><UserMinus className="h-4 w-4" /></button>}</motion.div>)}
           </div>
-          <button onClick={() => startArenaQuestion(pin, 0).catch(() => setError('無法開始對戰，請檢查網路'))} disabled={players.length === 0} className="w-full max-w-sm rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 py-4 text-lg font-black text-white shadow-lg disabled:opacity-40">▶ 開始對戰（{players.length} 人）</button>
+          <button onClick={() => startArenaQuestion(pin, 0).catch(() => setError('無法開始對戰，請檢查網路'))} disabled={activePlayers.length === 0} className="w-full max-w-sm rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 py-4 text-lg font-black text-white shadow-lg disabled:opacity-40">▶ 開始對戰（{activePlayers.length} 人）</button>
         </motion.div>
       )}
 
       {room.status === 'question' && currentQuestion && (
         <div className="relative w-full max-w-4xl overflow-hidden rounded-3xl border-4 border-primary/30 bg-card p-5 sm:p-8 text-center shadow-2xl">
-          <div className="mb-5 flex items-center justify-between"><span className="font-bold text-muted-foreground">第 {room.currentQuestionIndex + 1} / {room.questions.length} 題</span><span className="rounded-full bg-primary/10 px-4 py-2 text-sm font-black text-primary">已作答 {answeredCount} / {players.length}</span><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500 text-2xl font-black text-white shadow-lg">{timer}s</div></div>
+          <div className="mb-3 flex items-center justify-between"><span className="font-bold text-muted-foreground">第 {room.currentQuestionIndex + 1} / {room.questions.length} 題</span><span className="rounded-full bg-primary/10 px-4 py-2 text-sm font-black text-primary">已作答 {answeredCount} / {roster.eligiblePlayers.length}</span><div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-500 text-2xl font-black text-white shadow-lg">{timer}s</div></div>
+          {offlinePlayers.length > 0 && <button type="button" onClick={handleSkipOfflinePlayers} className="mb-4 inline-flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-black text-amber-800"><WifiOff className="h-4 w-4" /> 略過離線學生（{offlinePlayers.length}）</button>}
           <div className="mb-6 rounded-3xl border border-border bg-muted/40 py-7"><p className="mb-2 text-xs font-black tracking-widest text-muted-foreground">{currentQuestion.direction === 'en_to_zh' ? '看英文，選中文' : '看中文，選英文'}</p><h2 className="mb-3 text-4xl sm:text-5xl font-black text-primary">{currentQuestion.direction === 'en_to_zh' ? currentQuestion.word.english : currentQuestion.word.chinese}</h2>{currentQuestion.word.phonetic && currentQuestion.direction === 'en_to_zh' && <p className="mb-3 font-mono text-muted-foreground">{currentQuestion.word.phonetic}</p>}<AudioButton text={currentQuestion.word.english} size="lg" /></div>
           <div className="grid grid-cols-2 gap-3 sm:gap-4">{currentQuestion.options.map((option, index) => <div key={option.id} className={`flex min-h-24 items-center justify-center rounded-2xl p-4 text-xl sm:text-2xl font-black text-white shadow-md ${['bg-rose-500','bg-blue-500','bg-amber-500','bg-emerald-500'][index]}`}>{['▲','◆','●','■'][index]}<span className="ml-3">{currentQuestion.direction === 'en_to_zh' ? option.chinese : option.english}</span></div>)}</div>
         </div>

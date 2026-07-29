@@ -1,7 +1,7 @@
 /** Firebase Realtime Database classroom battle engine. */
 
 import { ensureAnonymousAuth, isFirebaseConfigured, rtdb } from '@/lib/firebase';
-import { get, onValue, ref, runTransaction, serverTimestamp, set, update } from 'firebase/database';
+import { get, onDisconnect, onValue, ref, remove, runTransaction, serverTimestamp, set, update } from 'firebase/database';
 import { generateQuestions, type QuestionDirection } from '@/lib/gameUtils';
 import type { Word } from '@/data/words';
 import { calculateArenaAnswerPoints } from '@/lib/arenaScoring';
@@ -31,6 +31,9 @@ export interface PlayerState {
   currentAnswer?: number;
   isCorrect?: boolean;
   answeredAt?: number;
+  online?: boolean;
+  lastSeenAt?: number;
+  excludedQuestionIndex?: number;
 }
 
 export interface ArenaRoom {
@@ -149,11 +152,11 @@ export async function joinArenaRoom(pin: string, nickname: string, avatar = 1): 
   if (!roomSnapshot.exists()) throw new Error('找不到這個對戰房間，請確認 PIN');
   const room = roomSnapshot.val() as ArenaRoom;
   if (room.expiresAt < Date.now()) throw new Error('這個對戰房間已過期');
-  if (room.status !== 'waiting') throw new Error('這場對戰已經開始，無法再加入');
-  if (!Array.isArray(room.questions) || room.questions.length === 0) throw new Error('房間沒有可用題目，請老師重新建立');
 
   const players = room.players ?? {};
   if (players[user.uid]) return user.uid;
+  if (room.status !== 'waiting') throw new Error('這場對戰已經開始，無法再加入');
+  if (!Array.isArray(room.questions) || room.questions.length === 0) throw new Error('房間沒有可用題目，請老師重新建立');
   if (Object.keys(players).length >= 60) throw new Error('房間人數已滿');
 
   const player: PlayerState = {
@@ -162,9 +165,57 @@ export async function joinArenaRoom(pin: string, nickname: string, avatar = 1): 
     avatar: Math.max(1, Math.min(8, avatar)),
     score: 0,
     joinedAt: Date.now(),
+    online: true,
+    lastSeenAt: Date.now(),
   };
   await set(ref(database, `arena_rooms/${cleanPin}/players/${user.uid}`), player);
   return user.uid;
+}
+
+/**
+ * Keep PlayerState presence fields synchronized with database.rules.json.
+ * onDisconnect is registered before setting online=true to avoid ghost players.
+ */
+export async function connectArenaPlayerPresence(pin: string, playerId: string): Promise<() => void> {
+  const database = requireArenaDatabase();
+  const user = await ensureAnonymousAuth();
+  if (user.uid !== playerId) throw new Error('玩家身分已失效，請重新加入');
+
+  const playerRef = ref(database, `arena_rooms/${pin}/players/${playerId}`);
+  const snapshot = await get(playerRef);
+  if (!snapshot.exists()) throw new Error('玩家已不在這個房間，請重新加入');
+
+  const disconnect = onDisconnect(playerRef);
+  await disconnect.update({ online: false, lastSeenAt: serverTimestamp() });
+  await update(playerRef, { online: true, lastSeenAt: serverTimestamp() });
+
+  return () => {
+    void disconnect.cancel();
+    void update(playerRef, { online: false, lastSeenAt: serverTimestamp() });
+  };
+}
+
+export async function removeArenaPlayer(pin: string, playerId: string): Promise<void> {
+  const database = requireArenaDatabase();
+  const user = await ensureAnonymousAuth();
+  const hostSnapshot = await get(ref(database, `arena_rooms/${pin}/hostUid`));
+  if (hostSnapshot.val() !== user.uid) throw new Error('只有房主可以移除玩家');
+  await remove(ref(database, `arena_rooms/${pin}/players/${playerId}`));
+}
+
+export async function skipArenaPlayersForQuestion(
+  pin: string,
+  playerIds: string[],
+  questionIndex: number,
+): Promise<void> {
+  if (playerIds.length === 0) return;
+  const database = requireArenaDatabase();
+  const user = await ensureAnonymousAuth();
+  const hostSnapshot = await get(ref(database, `arena_rooms/${pin}/hostUid`));
+  if (hostSnapshot.val() !== user.uid) throw new Error('只有房主可以略過離線玩家');
+  const updates: Record<string, number> = {};
+  for (const playerId of playerIds) updates[`${playerId}/excludedQuestionIndex`] = questionIndex;
+  await update(ref(database, `arena_rooms/${pin}/players`), updates);
 }
 
 export function subscribeArenaRoom(

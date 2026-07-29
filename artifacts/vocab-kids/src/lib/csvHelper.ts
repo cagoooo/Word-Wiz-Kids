@@ -9,12 +9,38 @@ export interface WordCSVRow {
   category?: string;
 }
 
+/** RFC 4180-compatible single-line parser, including commas and escaped quotes inside quoted cells. */
+export function parseCSVLine(line: string): string[] {
+  const cells: string[] = [];
+  let cell = '';
+  let quoted = false;
+
+  for (let index = 0; index < line.length; index += 1) {
+    const char = line[index];
+    if (char === '"') {
+      if (quoted && line[index + 1] === '"') {
+        cell += '"';
+        index += 1;
+      } else {
+        quoted = !quoted;
+      }
+    } else if (char === ',' && !quoted) {
+      cells.push(cell.trim());
+      cell = '';
+    } else {
+      cell += char;
+    }
+  }
+  cells.push(cell.trim());
+  return cells;
+}
+
 export function parseCSV(csvText: string): WordCSVRow[] {
   const lines = csvText.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
   if (lines.length === 0) return [];
 
   // Parse header
-  const headers = lines[0].split(',').map((h) => h.trim().toLowerCase().replace(/^["']|["']$/g, ''));
+  const headers = parseCSVLine(lines[0]).map((h) => h.trim().toLowerCase().replace(/^["']|["']$/g, ''));
   
   const engIdx = headers.findIndex((h) => h.includes('english') || h.includes('單字') || h.includes('英文'));
   const chiIdx = headers.findIndex((h) => h.includes('chinese') || h.includes('中文') || h.includes('翻譯'));
@@ -24,7 +50,7 @@ export function parseCSV(csvText: string): WordCSVRow[] {
   const results: WordCSVRow[] = [];
 
   for (let i = 1; i < lines.length; i++) {
-    const cols = lines[i].split(',').map((col) => col.trim().replace(/^["']|["']$/g, ''));
+    const cols = parseCSVLine(lines[i]).map((col) => col.trim().replace(/^'|'$/g, ''));
     if (cols.length === 0) continue;
 
     const english = engIdx !== -1 ? cols[engIdx] : cols[0];
@@ -32,14 +58,12 @@ export function parseCSV(csvText: string): WordCSVRow[] {
     const phonetic = phoIdx !== -1 ? cols[phoIdx] : cols[2];
     const category = catIdx !== -1 ? cols[catIdx] : cols[3];
 
-    if (english && chinese) {
-      results.push({
-        english: english.trim(),
-        chinese: chinese.trim(),
-        phonetic: (phonetic || '').trim(),
-        category: (category || 'Noun').trim(),
-      });
-    }
+    results.push({
+      english: (english || '').trim(),
+      chinese: (chinese || '').trim(),
+      phonetic: (phonetic || '').trim(),
+      category: (category || '其他').trim(),
+    });
   }
 
   return results;

@@ -19,6 +19,14 @@ import {
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './firebase';
 import type { Word } from '@/data/words';
+import {
+  analyzeWordCandidates,
+  normalizeWordCandidate,
+  resolveWordQualityPlan,
+  type WordCandidate,
+  type WordConflictStrategy,
+  type WordQualityPlan,
+} from './wordQuality';
 
 export interface FirestoreWord extends Omit<Word, 'vowels' | 'diphthongs'> {
   id: string;
@@ -62,23 +70,17 @@ function computeDiphthongs(english: string): { start: number; length: number }[]
 }
 
 /** Convert a partial word spec to a full FirestoreWord. */
-export function buildWordRecord(params: {
-  english: string;
-  chinese: string;
-  phonetic: string;
-  category: string;
-  example?: string;
-  exampleChinese?: string;
-}): Omit<FirestoreWord, 'id' | 'createdAt' | 'updatedAt'> {
+export function buildWordRecord(params: WordCandidate): Omit<FirestoreWord, 'id' | 'createdAt' | 'updatedAt'> {
+  const normalized = normalizeWordCandidate(params);
   return {
-    english: params.english,
-    chinese: params.chinese,
-    phonetic: params.phonetic,
-    category: params.category,
-    example: params.example ?? `I see a ${params.english}.`,
-    exampleChinese: params.exampleChinese ?? `我看到一個${params.chinese}。`,
-    vowels: computeVowels(params.english),
-    diphthongs: computeDiphthongs(params.english),
+    english: normalized.english,
+    chinese: normalized.chinese,
+    phonetic: normalized.phonetic,
+    category: normalized.category,
+    example: normalized.example ?? `I see a ${normalized.english}.`,
+    exampleChinese: normalized.exampleChinese ?? `我看到一個${normalized.chinese}。`,
+    vowels: computeVowels(normalized.english),
+    diphthongs: computeDiphthongs(normalized.english),
   };
 }
 
@@ -147,6 +149,9 @@ export async function addWord(
   if (!isFirebaseConfigured || !db) {
     throw new Error('Firebase 未設定');
   }
+  const quality = analyzeWordCandidates([params], await getAllWords());
+  const item = quality.items[0];
+  if (item.status !== 'new') throw new Error(`無法新增：${item.message}`);
   const record = buildWordRecord(params);
   const ref = await withFirestoreTimeout(
     addDoc(collection(db, 'words'), {
@@ -163,6 +168,18 @@ export async function updateWord(
   params: Partial<Parameters<typeof buildWordRecord>[0]>,
 ): Promise<void> {
   if (!isFirebaseConfigured || !db) return;
+  if (params.english !== undefined || params.chinese !== undefined) {
+    const words = await getAllWords();
+    const current = words.find((word) => word.id === id);
+    if (current) {
+      const quality = analyzeWordCandidates(
+        [{ ...current, ...params }],
+        words.filter((word) => word.id !== id),
+      );
+      const item = quality.items[0];
+      if (item.status !== 'new') throw new Error(`無法更新：${item.message}`);
+    }
+  }
   const ref = doc(db, 'words', id);
   const update: Record<string, unknown> = { updatedAt: serverTimestamp() };
   if (params.english !== undefined) {
@@ -187,13 +204,34 @@ export async function deleteWord(id: string): Promise<void> {
 export async function batchAddWords(
   words: Parameters<typeof buildWordRecord>[0][],
 ): Promise<FirestoreWord[]> {
+  const result = await importWordsWithQuality(words, 'skip');
+  return result.addedWords;
+}
+
+export interface WordImportResult {
+  plan: WordQualityPlan;
+  addedWords: FirestoreWord[];
+  updatedCount: number;
+}
+
+/**
+ * Quality-gated import shared by CSV and Gemini flows.
+ * Duplicate English labels are never silently inserted.
+ */
+export async function importWordsWithQuality(
+  words: WordCandidate[],
+  strategy: WordConflictStrategy = 'skip',
+): Promise<WordImportResult> {
   if (!isFirebaseConfigured || !db) {
     throw new Error('Firebase 未設定');
   }
+  const existing = await getAllWords();
+  const plan = analyzeWordCandidates(words, existing);
+  const { toAdd, toUpdate } = resolveWordQualityPlan(plan, strategy);
   const batch = writeBatch(db);
   const refs: { id: string; record: ReturnType<typeof buildWordRecord> }[] = [];
 
-  for (const params of words) {
+  for (const params of toAdd) {
     const record = buildWordRecord(params);
     const ref = doc(collection(db, 'words'));
     batch.set(ref, {
@@ -202,6 +240,13 @@ export async function batchAddWords(
       updatedAt: serverTimestamp(),
     });
     refs.push({ id: ref.id, record });
+  }
+
+  for (const { id, word } of toUpdate) {
+    batch.update(doc(db, 'words', id), {
+      ...buildWordRecord(word),
+      updatedAt: serverTimestamp(),
+    });
   }
 
   // Timeout after 15s — Firestore hangs silently when security rules block writes
@@ -217,6 +262,10 @@ export async function batchAddWords(
     ),
   );
 
-  await Promise.race([batch.commit(), timeout]);
-  return refs.map(({ id, record }) => ({ id, ...record }));
+  if (refs.length > 0 || toUpdate.length > 0) await Promise.race([batch.commit(), timeout]);
+  return {
+    plan,
+    addedWords: refs.map(({ id, record }) => ({ id, ...record })),
+    updatedCount: toUpdate.length,
+  };
 }

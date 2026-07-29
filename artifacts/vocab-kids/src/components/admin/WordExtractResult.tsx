@@ -3,18 +3,19 @@
  * Admin can edit each field, remove unwanted words, then batch-save to Firestore.
  * All text in Traditional Chinese. No emojis.
  */
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, Trash2, Plus, Loader2, AlertCircle } from 'lucide-react';
 import type { ExtractedWord } from '@/lib/geminiClient';
-import { batchAddWords } from '@/lib/firestoreWords';
+import { getAllWords, importWordsWithQuality, type FirestoreWord } from '@/lib/firestoreWords';
 import { isFirebaseConfigured } from '@/lib/firebase';
+import { analyzeWordCandidates, WORD_CATEGORIES, type WordConflictStrategy } from '@/lib/wordQuality';
 
 interface EditableWord extends ExtractedWord {
   _key: number;
 }
 
-const CATEGORIES = ['動物', '水果', '顏色', '數字', '食物', '交通', '家庭', '身體', '學校', '其他'];
+const CATEGORIES = WORD_CATEGORIES;
 
 interface Props {
   words: ExtractedWord[];
@@ -28,6 +29,18 @@ export function WordExtractResult({ words: initialWords, onSaved, onReset }: Pro
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [existingWords, setExistingWords] = useState<FirestoreWord[]>([]);
+  const [qualityLoading, setQualityLoading] = useState(isFirebaseConfigured);
+  const [conflictStrategy, setConflictStrategy] = useState<WordConflictStrategy>('skip');
+  const qualityPlan = useMemo(() => analyzeWordCandidates(words, existingWords), [words, existingWords]);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) return;
+    void getAllWords()
+      .then(setExistingWords)
+      .catch((loadError) => setError(loadError instanceof Error ? loadError.message : '無法檢查既有單字'))
+      .finally(() => setQualityLoading(false));
+  }, []);
 
   function updateWord(key: number, field: keyof ExtractedWord, value: string) {
     setWords((prev) =>
@@ -59,15 +72,16 @@ export function WordExtractResult({ words: initialWords, onSaved, onReset }: Pro
     setSaving(true);
     setError(null);
     try {
-      await batchAddWords(
+      const result = await importWordsWithQuality(
         valid.map((w) => ({
-          english: w.english.trim().toLowerCase(),
+          english: w.english,
           chinese: w.chinese.trim(),
           phonetic: w.phonetic.trim() || `/${w.english}/`,
           category: w.category,
         })),
+        conflictStrategy,
       );
-      onSaved(valid.length);
+      onSaved(result.addedWords.length + result.updatedCount);
     } catch (e) {
       setError(e instanceof Error ? e.message : '儲存失敗，請再試一次。');
     } finally {
@@ -96,6 +110,22 @@ export function WordExtractResult({ words: initialWords, onSaved, onReset }: Pro
           <span className="whitespace-pre-line">{error}</span>
         </div>
       )}
+
+      <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4" data-testid="gemini-quality-preview">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="font-black text-foreground">寫入前品質檢查</p>
+            <p className="text-sm text-muted-foreground">
+              {qualityLoading ? '正在比對現有單字庫…' : `可新增 ${qualityPlan.summary.new} · 完全重複 ${qualityPlan.summary.exact_duplicate} · 衝突 ${qualityPlan.summary.conflict} · 批內重複 ${qualityPlan.summary.batch_duplicate} · 無效 ${qualityPlan.summary.invalid}`}
+            </p>
+          </div>
+          <select value={conflictStrategy} onChange={(event) => setConflictStrategy(event.target.value as WordConflictStrategy)} className="rounded-xl border border-border bg-card px-3 py-2 text-sm font-bold">
+            <option value="skip">衝突時略過</option>
+            <option value="merge">衝突時合併缺少欄位</option>
+            <option value="overwrite">衝突時以辨識結果覆蓋</option>
+          </select>
+        </div>
+      </div>
 
       {/* Word list */}
       <div className="space-y-3 max-h-[480px] overflow-y-auto pr-1">
@@ -176,7 +206,7 @@ export function WordExtractResult({ words: initialWords, onSaved, onReset }: Pro
         </button>
         <button
           onClick={handleSave}
-          disabled={saving || words.length === 0}
+          disabled={saving || qualityLoading || qualityPlan.summary.new + qualityPlan.summary.conflict === 0}
           className="flex-1 flex items-center justify-center gap-2 py-3 bg-primary hover:bg-primary/90 text-primary-foreground rounded-2xl font-black text-lg disabled:opacity-50 transition-colors"
           data-testid="btn-save-words"
         >

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowLeft, CheckCircle2, Gamepad2, Loader2, Sparkles, Trophy, XCircle } from 'lucide-react';
 import { Link } from 'wouter';
-import { joinArenaRoom, subscribeArenaRoom, subscribeArenaServerTimeOffset, submitArenaAnswer, type ArenaRoom } from '@/lib/realtimeArena';
+import { connectArenaPlayerPresence, joinArenaRoom, subscribeArenaRoom, subscribeArenaServerTimeOffset, submitArenaAnswer, type ArenaRoom } from '@/lib/realtimeArena';
 import { getArenaTimeState } from '@/lib/arenaScoring';
 import { sfxCorrect, sfxWrong, startBGM, stopBGM } from '@/lib/soundEngine';
 import { speakText, speakWord } from '@/lib/tts';
@@ -71,7 +71,7 @@ export default function ArenaPlayer() {
   };
 
   useEffect(() => {
-    if (!joined || !pin) return;
+    if (!joined || !pin || !playerId) return;
     const unsubscribe = subscribeArenaRoom(
       pin,
       (nextRoom) => {
@@ -83,12 +83,36 @@ export default function ArenaPlayer() {
           setError('找不到這個房間，請向老師確認 PIN');
           return;
         }
+        if (!nextRoom.players?.[playerId]) {
+          sessionStorage.removeItem(PLAYER_SESSION_KEY);
+          setJoined(false);
+          setPlayerId(null);
+          setRoom(null);
+          setError('老師已將你移出房間，請重新加入');
+          return;
+        }
         setRoom(nextRoom);
       },
       () => setError('與對戰房間的連線中斷，正在等待重新連線'),
     );
     return unsubscribe;
-  }, [joined, pin]);
+  }, [joined, pin, playerId]);
+
+  useEffect(() => {
+    if (!joined || !pin || !playerId) return;
+    let cancelled = false;
+    let disconnectPresence = () => {};
+    void connectArenaPlayerPresence(pin, playerId)
+      .then((cleanup) => {
+        if (cancelled) cleanup();
+        else disconnectPresence = cleanup;
+      })
+      .catch((presenceError) => setError(presenceError instanceof Error ? presenceError.message : '無法恢復對戰連線'));
+    return () => {
+      cancelled = true;
+      disconnectPresence();
+    };
+  }, [joined, pin, playerId]);
 
   useEffect(() => {
     setSelectedOption(null);
