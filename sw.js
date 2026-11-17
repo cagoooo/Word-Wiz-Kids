@@ -1,6 +1,9 @@
 // CI 注入「workflow run number + commit hash」；同一 commit 重跑時版本保持不變。
-const BUILD_VERSION = "58-8b2b18a75075";
-const CACHE_NAME = `vocab-kids-${BUILD_VERSION}`;
+const BUILD_VERSION = "59-ea2bb54081c5";
+// 同網域（cagoooo.github.io）各工具共用快取空間，只清自己前綴的舊快取
+// （含舊版 vocab-kids-cache-vN）
+const CACHE_PREFIX = "vocab-kids-";
+const CACHE_NAME = `${CACHE_PREFIX}${BUILD_VERSION}`;
 const ASSETS = [
   "./manifest.webmanifest?v=10",
   "./icon.png?v=10",
@@ -32,7 +35,7 @@ self.addEventListener("activate", (event) => {
   event.waitUntil(
     caches.keys().then((keys) =>
       Promise.all(
-        keys.filter((key) => key !== CACHE_NAME).map((key) => caches.delete(key))
+        keys.filter((key) => key.startsWith(CACHE_PREFIX) && key !== CACHE_NAME).map((key) => caches.delete(key))
       )
     ).then(() => self.clients.claim())
       .then(() => self.clients.matchAll({ includeUncontrolled: true }))
