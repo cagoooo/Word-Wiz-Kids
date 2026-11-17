@@ -2,7 +2,7 @@ import { HeroScene } from '@/components/hero/HeroScene';
 import { motion } from 'framer-motion';
 import {
   Sparkles, ArrowRight, Star, BookOpen, Gamepad2, Trophy,
-  Swords, Camera, Headphones, Zap, ChevronRight,
+  Swords, Camera, Headphones, Zap, ChevronRight, Medal,
 } from 'lucide-react';
 import { Link } from 'wouter';
 import { UserExpBar } from '@/components/gamification/UserExpBar';
@@ -246,6 +246,50 @@ export default function Home() {
           </motion.div>
         </div>
       </section>
+
+      {/* 選單畫面頁尾：作者署名（只在首頁，遊戲與測驗畫面不顯示） */}
+      <footer className="relative border-t border-border bg-card/80 print:hidden" data-testid="home-footer">
+        <div className="h-1 w-full bg-gradient-to-r from-violet-500 via-pink-500 to-amber-400" aria-hidden="true" />
+        <div className="max-w-5xl mx-auto px-4 py-8 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+          <div className="flex items-center gap-3 justify-center md:justify-start">
+            <div className="w-12 h-12 shrink-0 rounded-full bg-primary flex items-center justify-center text-primary-foreground shadow-md">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div className="text-left">
+              <p className="text-lg font-bold text-foreground">單字小英雄</p>
+              <p className="text-sm text-foreground/70">國小英語單字學習、闖關與全班對戰</p>
+            </div>
+          </div>
+          <nav className="flex flex-wrap justify-center gap-2" aria-label="頁尾快速連結">
+            <Link href="/learn" className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full border border-primary/30 bg-primary/10 text-primary font-bold text-sm hover:bg-primary/20 transition-colors">
+              <BookOpen className="w-4 h-4" />開始學習
+            </Link>
+            <Link href="/game" className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full border border-orange-400/40 bg-orange-400/10 text-orange-600 font-bold text-sm hover:bg-orange-400/20 transition-colors">
+              <Star className="w-4 h-4" />單人挑戰
+            </Link>
+            <Link href="/leaderboard" className="inline-flex items-center gap-1.5 min-h-[44px] px-4 rounded-full border border-amber-400/40 bg-amber-400/10 text-amber-700 font-bold text-sm hover:bg-amber-400/20 transition-colors">
+              <Medal className="w-4 h-4" />排行榜
+            </Link>
+          </nav>
+        </div>
+        <div className="border-t border-border/70">
+          <p className="max-w-5xl mx-auto px-4 py-4 text-center text-sm text-foreground/75">
+            Made with <span aria-label="愛心" className="inline-block mx-0.5">❤️</span> by{' '}
+            <a
+              href="https://cagoooo.github.io/Akai/"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="阿凱老師教育科技創新專區"
+              className="inline-block py-1 font-bold text-primary border-b border-dotted border-current hover:border-solid"
+            >
+              阿凱老師
+            </a>
+            <span className="block sm:inline">
+              <span className="hidden sm:inline" aria-hidden="true">・</span>桃園市龍潭區石門國民小學
+            </span>
+          </p>
+        </div>
+      </footer>
     </div>
   );
 }
