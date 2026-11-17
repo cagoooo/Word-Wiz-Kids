@@ -67,7 +67,12 @@ async function recoverFromChunkError(message: string) {
 
   try {
     const registrations = await navigator.serviceWorker?.getRegistrations();
-    await Promise.all((registrations || []).map((registration) => registration.unregister()));
+    // 只解除本站（/Word-Wiz-Kids/）的註冊，不動同網域其他工具的 Service Worker
+    // （base 為 './'，BASE_URL 不是絕對路徑，所以直接寫 repo 路徑；GitHub Pages 路徑大小寫敏感）
+    const ownScope = `${window.location.origin}/Word-Wiz-Kids/`;
+    await Promise.all((registrations || [])
+      .filter((registration) => registration.scope.startsWith(ownScope))
+      .map((registration) => registration.unregister()));
 
     if ('caches' in window) {
       const keys = await caches.keys();
