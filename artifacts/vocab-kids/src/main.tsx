@@ -71,7 +71,8 @@ async function recoverFromChunkError(message: string) {
 
     if ('caches' in window) {
       const keys = await caches.keys();
-      await Promise.all(keys.map((key) => caches.delete(key)));
+      // 只清本站（vocab-kids-）的快取，不動同網域其他工具的快取
+      await Promise.all(keys.filter((key) => key.startsWith('vocab-kids-')).map((key) => caches.delete(key)));
     }
   } catch (error) {
     console.warn('[PWA] 清除舊版快取失敗，改為直接重新載入。', error);
