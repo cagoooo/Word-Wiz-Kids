@@ -26,5 +26,13 @@ jobs:
       - run: pnpm --filter @workspace/vocab-kids run test:unit
       - run: pnpm --filter @workspace/vocab-kids run test:rules
       - run: pnpm --filter @workspace/vocab-kids run build
-      - run: pnpm --filter @workspace/vocab-kids exec playwright install --with-deps chromium
+      - name: Install Playwright (chromium)
+        # 下載站偶爾卡住：每次最多 3 分鐘，失敗重試一次，整步最多 8 分鐘就結束，不讓 job 卡到 60 分鐘
+        timeout-minutes: 8
+        run: |
+          for i in 1 2; do
+            timeout 180 pnpm --filter @workspace/vocab-kids exec playwright install --with-deps chromium && exit 0
+            echo "第 $i 次安裝 Playwright 瀏覽器失敗或逾時"
+          done
+          exit 1
       - run: pnpm --filter @workspace/vocab-kids run test:e2e
