@@ -1,5 +1,5 @@
 // CI 注入「workflow run number + commit hash」；同一 commit 重跑時版本保持不變。
-const BUILD_VERSION = "61-48756edbadf4";
+const BUILD_VERSION = "62-d93612b8394f";
 // 同網域（cagoooo.github.io）各工具共用快取空間，只清自己前綴的舊快取
 // （含舊版 vocab-kids-cache-vN）
 const CACHE_PREFIX = "vocab-kids-";
