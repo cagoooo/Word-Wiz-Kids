@@ -47,6 +47,27 @@ type GameAction =
   | { type: "RESTART" }
   | { type: "CHANGE_TOPIC" };
 
+// 震動回饋（有支援才震）
+function vibrate(ms: number) {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") navigator.vibrate(ms);
+  } catch {
+    // 忽略不支援的環境
+  }
+}
+
+// iOS Safari 要求第一次朗讀由使用者手勢觸發：在點擊開始時先無聲「暖機」一次
+function unlockSpeech() {
+  try {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+    const u = new SpeechSynthesisUtterance(" ");
+    u.volume = 0;
+    window.speechSynthesis.speak(u);
+  } catch {
+    // 忽略不支援的環境
+  }
+}
+
 function gameReducer(state: GameState, action: GameAction): GameState {
   switch (action.type) {
     case "SET_CATEGORY":
@@ -162,6 +183,8 @@ export default function Game() {
   const [timerWidth, setTimerWidth] = useState("100%");
   const timerStartRef = useRef<number>(0);
   const timerTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const nextQuestionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [timerDurationMs, setTimerDurationMs] = useState(10000);
   const gamificationRecordedRef = useRef(false);
 
   // Auto-scroll refs for the 3-step select screen
@@ -176,13 +199,30 @@ export default function Game() {
 
   const QUESTION_TIME_MS = 10000;
 
+  // 登記「換下一題」的計時器，離開頁面／重新開始時才能清掉，避免舊計時器讓新的一局跳題
+  const clearNextQuestionTimer = () => {
+    if (nextQuestionTimerRef.current) {
+      clearTimeout(nextQuestionTimerRef.current);
+      nextQuestionTimerRef.current = null;
+    }
+  };
+  const scheduleNextQuestion = (delayMs: number) => {
+    clearNextQuestionTimer();
+    nextQuestionTimerRef.current = setTimeout(() => {
+      nextQuestionTimerRef.current = null;
+      dispatch({ type: "NEXT_QUESTION" });
+    }, delayMs);
+  };
+
   useEffect(() => {
     return () => {
       if (timerTimeoutRef.current) clearTimeout(timerTimeoutRef.current);
+      clearNextQuestionTimer();
     };
   }, []);
 
   useEffect(() => {
+    if (state.phase !== "question") clearNextQuestionTimer();
     if (state.phase === "countdown") {
       sfxCountdownTick();
       setCountdown(3);
@@ -227,21 +267,42 @@ export default function Game() {
       if (q.direction === "en_to_zh") speakWord(q.word.english);
       else speakText(q.word.chinese);
 
+      setTimerDurationMs(QUESTION_TIME_MS);
       setTimerWidth("100%");
-      const transitionTimer = setTimeout(() => {
+      let transitionTimer = setTimeout(() => {
         setTimerWidth("0%");
       }, 50);
 
       timerStartRef.current = Date.now();
-      timerTimeoutRef.current = setTimeout(() => {
+      const handleTimeUp = () => {
         setTimerWidth("0%");
         dispatch({ type: "TIME_UP" });
-        setTimeout(() => {
-          dispatch({ type: "NEXT_QUESTION" });
-        }, 2000);
-      }, QUESTION_TIME_MS);
+        scheduleNextQuestion(2000);
+      };
+      timerTimeoutRef.current = setTimeout(handleTimeUp, QUESTION_TIME_MS);
+
+      // 分頁切到背景後計時器可能被節流：回到前景時以「開始時間戳」重新對齊倒數條與實際計時
+      const handleVisibility = () => {
+        if (document.visibilityState !== "visible") return;
+        const remaining = QUESTION_TIME_MS - (Date.now() - timerStartRef.current);
+        if (timerTimeoutRef.current) clearTimeout(timerTimeoutRef.current);
+        clearTimeout(transitionTimer);
+        if (remaining <= 0) {
+          handleTimeUp();
+          return;
+        }
+        setTimerDurationMs(0);
+        setTimerWidth(`${(remaining / QUESTION_TIME_MS) * 100}%`);
+        transitionTimer = setTimeout(() => {
+          setTimerDurationMs(remaining);
+          setTimerWidth("0%");
+        }, 50);
+        timerTimeoutRef.current = setTimeout(handleTimeUp, remaining);
+      };
+      document.addEventListener("visibilitychange", handleVisibility);
 
       return () => {
+        document.removeEventListener("visibilitychange", handleVisibility);
         clearTimeout(transitionTimer);
         if (timerTimeoutRef.current) clearTimeout(timerTimeoutRef.current);
       };
@@ -301,8 +362,10 @@ export default function Game() {
     const isCorrect = index === q.correctIndex;
     if (isCorrect) {
       sfxCorrect();
+      if (!muted) vibrate(20);
     } else {
       sfxWrong();
+      if (!muted) vibrate(80);
       recordMistake(q.options[q.correctIndex]); // Record correct target word as mistake for review
     }
 
@@ -316,9 +379,7 @@ export default function Game() {
       payload: { selectedIndex: index, isCorrect, scoreGain },
     });
 
-    setTimeout(() => {
-      dispatch({ type: "NEXT_QUESTION" });
-    }, 1500);
+    scheduleNextQuestion(1500);
   };
 
   const handleOptionClick = (index: number) => {
@@ -497,6 +558,8 @@ export default function Game() {
         disabled={!canStart}
         onClick={() => {
           gamificationRecordedRef.current = false;
+          clearNextQuestionTimer();
+          unlockSpeech();
           dispatch({ type: "START_COUNTDOWN" });
         }}
         className="w-full py-5 sm:py-7 bg-green-500 hover:bg-green-600 active:scale-95 active:translate-y-1 text-white rounded-[2rem] sm:rounded-[3rem] text-2xl sm:text-4xl font-black shadow-[0_8px_0_rgba(21,128,61,1)] sm:shadow-[0_10px_0_rgba(21,128,61,1)] transition-all flex items-center justify-center gap-4 sm:gap-6 group hover:-translate-y-1 hover:shadow-[0_12px_0_rgba(21,128,61,1)] disabled:opacity-50 disabled:cursor-not-allowed disabled:translate-y-0 disabled:shadow-none"
@@ -643,7 +706,7 @@ export default function Game() {
               className={`h-full rounded-full ${state.selectedOptionIndex !== null ? (state.selectedOptionIndex === q.correctIndex ? "bg-green-400" : "bg-red-400") : "bg-primary"}`}
               style={{
                 width: timerWidth,
-                transitionDuration: state.selectedOptionIndex !== null ? "0ms" : `${QUESTION_TIME_MS}ms`,
+                transitionDuration: state.selectedOptionIndex !== null ? "0ms" : `${timerDurationMs}ms`,
                 transitionTimingFunction: "linear",
               }}
             />
@@ -797,6 +860,8 @@ export default function Game() {
             data-testid="btn-replay"
             onClick={() => {
               gamificationRecordedRef.current = false;
+              clearNextQuestionTimer();
+              unlockSpeech();
               dispatch({ type: "RESTART" });
             }}
             className="flex-1 py-5 bg-primary hover:bg-primary/90 text-white rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(147,51,234,1)] active:translate-y-2 active:shadow-none transition-all"
@@ -807,6 +872,7 @@ export default function Game() {
             data-testid="btn-change-topic"
             onClick={() => {
               gamificationRecordedRef.current = false;
+              clearNextQuestionTimer();
               dispatch({ type: "CHANGE_TOPIC" });
             }}
             className="flex-1 py-5 bg-card border-4 border-border hover:bg-muted text-foreground rounded-[1.5rem] text-2xl font-black shadow-[0_6px_0_rgba(0,0,0,0.1)] active:translate-y-2 active:shadow-none transition-all"
